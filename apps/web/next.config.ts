@@ -53,6 +53,8 @@ const nextConfig: NextConfig = {
   devIndicators: { position: "top-right" },
   // The shared package ships TypeScript source; Next compiles it with the app.
   transpilePackages: ["@orbit/core"],
+  // A second dev server (preview mode) can use its own build folder.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Server Actions only accept same-origin calls (Next's default); cap body size.
   experimental: { serverActions: { bodySizeLimit: "1mb" } },
   async headers() {

@@ -1,43 +1,65 @@
-import { ArrowLeft, ArrowRight, ArrowUp, Compass, type LucideIcon } from "lucide-react";
+import { feedFiltersToQuery, parseFeedFilters } from "@orbit/core";
+import { AlertTriangle, RadioTower } from "lucide-react";
 import type { Metadata } from "next";
-import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
+import { DiscoverView } from "@/components/discover/discover-view";
 import { PageHeader } from "@/components/ui/page-header";
+import { fetchApplyBudget, fetchFeed, fetchSourceHealth, type SourceHealth } from "@/lib/data.server";
+import { demoFeed } from "@/lib/demo";
+import { isSupabaseConfigured } from "@/lib/env";
+import { timeAgo } from "@/lib/jobs/format";
+import { getCurrentUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Discover" };
 
-const GESTURES: { icon: LucideIcon; label: string; detail: string; key: string }[] = [
-  { icon: ArrowRight, label: "Swipe right", detail: "Tailor your resume and apply", key: "→" },
-  { icon: ArrowUp, label: "Swipe up", detail: "Save for later", key: "↑" },
-  { icon: ArrowLeft, label: "Swipe left", detail: "Skip, and see fewer like it", key: "←" },
-];
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-export default function DiscoverPage() {
+export default async function DiscoverPage({ searchParams }: { searchParams: SearchParams }) {
+  const filters = parseFeedFilters(await searchParams);
+  const live = isSupabaseConfigured();
+  const user = live ? await getCurrentUser() : null;
+
+  const [jobs, budget, health] =
+    live && user
+      ? await Promise.all([fetchFeed(filters, null), fetchApplyBudget(user.id), fetchSourceHealth()])
+      : [demoFeed(filters), { used: 0, cap: 15 }, null];
+
   return (
     <>
-      <PageHeader title="Discover" description="New jobs matched to you, refreshed every few hours." />
-      <Card>
-        <EmptyState
-          icon={Compass}
-          title="Your deck is on its way"
-          description="Orbit pulls fresh postings from company career sites and job boards every few hours. Once jobs arrive, they show up here as a swipe deck."
-        >
-          <ul className="grid gap-3 text-left sm:grid-cols-3">
-            {GESTURES.map(({ icon: Icon, label, detail, key }) => (
-              <li key={label} className="flex items-start gap-3 rounded-xl border bg-surface-2 p-3">
-                <Icon className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-xs text-muted">{detail}</p>
-                  <p className="mt-1.5 text-xs text-muted">
-                    Desktop: <kbd className="rounded border bg-surface px-1 font-mono">{key}</kbd>
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </EmptyState>
-      </Card>
+      {/* Phones skip the header so the deck fits on one screen; the tab bar names the page. */}
+      <PageHeader
+        className="max-md:hidden"
+        title="Discover"
+        description={live ? "Fresh postings matched to your filters. Swipe right to apply." : "Sample jobs (preview mode). Swipes stay in this tab."}
+        actions={health ? <HealthLine health={health} /> : null}
+      />
+      {/* A new filter set starts a fresh deck. */}
+      <DiscoverView
+        key={feedFiltersToQuery(filters)}
+        initialJobs={jobs}
+        filters={filters}
+        mode={live ? "live" : "demo"}
+        budget={budget}
+      />
     </>
+  );
+}
+
+function HealthLine({ health }: { health: SourceHealth }) {
+  if (!health.lastRunAt) {
+    return <p className="text-xs text-muted">No job fetch in the last 2 days</p>;
+  }
+  const failing = health.failing.length;
+  return (
+    <p
+      className="inline-flex items-center gap-1.5 text-xs text-muted"
+      title={failing ? `Failing: ${health.failing.join(", ")}` : undefined}
+    >
+      {failing ? (
+        <AlertTriangle className="size-3.5 text-warning" aria-hidden />
+      ) : (
+        <RadioTower className="size-3.5 text-success" aria-hidden />
+      )}
+      Updated {timeAgo(health.lastRunAt)} · {health.sources - failing}/{health.sources} sources OK
+    </p>
   );
 }

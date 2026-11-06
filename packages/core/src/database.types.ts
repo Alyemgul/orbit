@@ -173,6 +173,30 @@ export type ApplicationEventRow = {
   created_at: string;
 };
 
+/** A row of my_pipeline(): an application with the job fields a board card shows. */
+export type PipelineItem = Pick<
+  ApplicationRow,
+  "id" | "job_id" | "status" | "mode" | "applied_at" | "last_error" | "updated_at" | "created_at"
+> &
+  Pick<JobRow, "title" | "company" | "location" | "country_codes" | "workplace" | "experience_level" | "category" | "apply_url"> & {
+    job_closed_at: string | null;
+  };
+
+export type ActivityDay = { day: string; swipes: number; applied: number };
+
+export type DiscoverFeedArgs = {
+  p_countries?: string[] | null;
+  p_region_word?: string | null;
+  p_levels?: ExperienceLevel[] | null;
+  p_categories?: JobCategory[] | null;
+  p_workplaces?: WorkplaceType[] | null;
+  p_visa_only?: boolean;
+  p_query?: string | null;
+  p_cursor_ts?: string | null;
+  p_cursor_id?: string | null;
+  p_limit?: number;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -193,6 +217,11 @@ export type Database = {
       ingest_upsert_jobs: { Args: { p_jobs: JobUpsert[] }; Returns: number };
       ingest_close_missing: { Args: { p_source: string; p_seen_before: string }; Returns: number };
       ingest_prune: { Args: { p_retention_days: number }; Returns: number };
+      discover_feed: { Args: DiscoverFeedArgs; Returns: JobRow[] };
+      record_swipe: { Args: { p_job_id: string; p_decision: SwipeDecision }; Returns: string | null };
+      undo_swipe: { Args: { p_job_id: string }; Returns: undefined };
+      my_pipeline: { Args: Record<PropertyKey, never>; Returns: PipelineItem[] };
+      my_activity: { Args: { p_days?: number; p_time_zone?: string }; Returns: ActivityDay[] };
     };
     Enums: {
       ats_type: AtsType;

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createServerClient } from "@supabase/ssr";
+import type { Database } from "@orbit/core";
 import type { User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { SupabaseNotConfiguredError, getSupabaseEnv } from "@/lib/env";
@@ -11,7 +12,7 @@ export async function createClient() {
   if (!env) throw new SupabaseNotConfiguredError();
 
   const cookieStore = await cookies();
-  return createServerClient(env.url, env.anonKey, {
+  return createServerClient<Database>(env.url, env.anonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

@@ -22,6 +22,13 @@ MIT License text, as required for the projects above:
 > all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS",
 > WITHOUT WARRANTY OF ANY KIND.
 
+## Libraries
+
+Built on open-source libraries including [Next.js](https://nextjs.org),
+[Supabase](https://supabase.com), [Motion](https://motion.dev) (MIT) for animation,
+[dnd-kit](https://dndkit.com) (MIT) for drag and drop, [Tailwind CSS](https://tailwindcss.com),
+[Lucide](https://lucide.dev) icons and [Zod](https://zod.dev).
+
 ## Ideas only (no code copied)
 
 - **[Dossier](https://github.com/AienTech/dossier)** (AGPL-3.0): product ideas such as

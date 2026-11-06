@@ -7,3 +7,4 @@ export * from "./jobs/html";
 export * from "./jobs/job";
 export * from "./jobs/location";
 export * from "./jobs/regions";
+export * from "./feed";

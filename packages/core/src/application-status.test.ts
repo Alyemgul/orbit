@@ -28,7 +28,8 @@ describe("application state machine", () => {
   });
 
   it("rejects skipping the pipeline", () => {
-    expect(canTransition("queued", "applied")).toBe(false);
+    expect(canTransition("queued", "offer")).toBe(false);
+    expect(canTransition("saved", "interviewing")).toBe(false);
     expect(canTransition("offer", "applied")).toBe(false);
     expect(() => assertTransition("rejected", "offer")).toThrow(InvalidTransitionError);
   });

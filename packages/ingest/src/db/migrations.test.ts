@@ -247,4 +247,108 @@ describe("database migrations", () => {
       expect(updated.rows).toHaveLength(0);
     });
   });
+
+  describe("discover feed and swipes", () => {
+    async function seedFeed(): Promise<Record<string, string>> {
+      await upsert(db, [
+        jobPayload({ dedupe_hash: "berlin", source_job_id: "1", title: "Graduate Software Engineer", experience_level: "entry", posted_at: "2026-11-05T10:00:00Z" }),
+        jobPayload({ dedupe_hash: "tokyo", source_job_id: "2", title: "Backend Engineer", location: "Tokyo, Japan", country_codes: ["JP"], posted_at: "2026-11-04T10:00:00Z" }),
+        jobPayload({ dedupe_hash: "remote-eu", source_job_id: "3", title: "Data Intern", location: "Remote, Europe", country_codes: [], experience_level: "intern", category: "data", posted_at: "2026-11-03T10:00:00Z" }),
+        jobPayload({ dedupe_hash: "nyc", source_job_id: "4", title: "Quant Developer", location: "New York, NY", country_codes: ["US"], category: "quant", visa_sponsorship: "yes", posted_at: "2026-11-02T10:00:00Z" }),
+      ]);
+      const result = await db.query<{ id: string; dedupe_hash: string }>("select id, dedupe_hash from public.jobs");
+      return Object.fromEntries(result.rows.map((row) => [row.dedupe_hash, row.id]));
+    }
+
+    async function feed(userId: string, args = "", params: unknown[] = []): Promise<string[]> {
+      const result = await asUser(db, userId, () =>
+        db.query<{ title: string }>(`select title from public.discover_feed(${args})`, params),
+      );
+      return result.rows.map((row) => row.title);
+    }
+
+    it("lists open jobs newest first, filtered by region, level, category and visa", async () => {
+      await seedFeed();
+      expect(await feed(ALICE)).toEqual(["Graduate Software Engineer", "Backend Engineer", "Data Intern", "Quant Developer"]);
+      expect(await feed(ALICE, "p_countries => $1, p_region_word => 'europe'", [["DE", "FR"]])).toEqual([
+        "Graduate Software Engineer",
+        "Data Intern",
+      ]);
+      expect(await feed(ALICE, "p_levels => array['entry','intern']::public.experience_level[]")).toEqual([
+        "Graduate Software Engineer",
+        "Data Intern",
+      ]);
+      expect(await feed(ALICE, "p_categories => array['quant']::public.job_category[]")).toEqual(["Quant Developer"]);
+      expect(await feed(ALICE, "p_visa_only => true")).toEqual(["Quant Developer"]);
+      expect(await feed(ALICE, "p_query => 'graduate'")).toEqual(["Graduate Software Engineer"]);
+    });
+
+    it("pages with a cursor and caps the page size", async () => {
+      await seedFeed();
+      const first = await asUser(db, ALICE, () =>
+        db.query<{ id: string; posted_at: Date }>("select id, posted_at from public.discover_feed(p_limit => 2)"),
+      );
+      const last = first.rows[1]!;
+      expect(
+        await feed(ALICE, "p_cursor_ts => $1, p_cursor_id => $2, p_limit => 10", [last.posted_at, last.id]),
+      ).toEqual(["Data Intern", "Quant Developer"]);
+      expect(await feed(ALICE, "p_limit => 100000")).toHaveLength(4);
+    });
+
+    it("records swipes, creates applications and hides swiped jobs only for that user", async () => {
+      const ids = await seedFeed();
+      await asUser(db, ALICE, async () => {
+        await db.query("select public.record_swipe($1, 'apply')", [ids.berlin]);
+        await db.query("select public.record_swipe($1, 'save')", [ids.tokyo]);
+        await db.query("select public.record_swipe($1, 'skip')", [ids.nyc]);
+      });
+      expect(await feed(ALICE)).toEqual(["Data Intern"]);
+      expect(await feed(BOB)).toHaveLength(4);
+
+      const board = await asUser(db, ALICE, () =>
+        db.query<{ title: string; status: string }>("select title, status::text from public.my_pipeline() order by title"),
+      );
+      expect(board.rows).toEqual([
+        { title: "Backend Engineer", status: "saved" },
+        { title: "Graduate Software Engineer", status: "queued" },
+      ]);
+      const bobBoard = await asUser(db, BOB, () => db.query("select * from public.my_pipeline()"));
+      expect(bobBoard.rows).toHaveLength(0);
+    });
+
+    it("undoes a fresh swipe, but never removes an application that already moved on", async () => {
+      const ids = await seedFeed();
+      await asUser(db, ALICE, async () => {
+        await db.query("select public.record_swipe($1, 'apply')", [ids.berlin]);
+        await db.query("select public.undo_swipe($1)", [ids.berlin]);
+      });
+      expect(await feed(ALICE)).toHaveLength(4);
+      expect((await db.query("select id from public.applications")).rows).toHaveLength(0);
+
+      await asUser(db, ALICE, () => db.query("select public.record_swipe($1, 'apply')", [ids.berlin]));
+      await db.query("update public.applications set status = 'tailoring'");
+      await asUser(db, ALICE, () => db.query("select public.undo_swipe($1)", [ids.berlin]));
+      expect((await db.query("select status::text from public.applications")).rows).toEqual([{ status: "tailoring" }]);
+    });
+
+    it("counts activity per day", async () => {
+      const ids = await seedFeed();
+      await asUser(db, ALICE, async () => {
+        await db.query("select public.record_swipe($1, 'skip')", [ids.tokyo]);
+        await db.query("select public.record_swipe($1, 'save')", [ids.berlin]);
+      });
+      await db.query("update public.applications set status = 'applied'");
+      const rows = await asUser(db, ALICE, () =>
+        db.query<{ swipes: number; applied: number }>("select swipes, applied from public.my_activity(30, 'Europe/Budapest')"),
+      );
+      expect(rows.rows).toEqual([{ swipes: 2, applied: 1 }]);
+      // Unknown time zones fall back to UTC instead of erroring.
+      await expect(asUser(db, ALICE, () => db.query("select * from public.my_activity(30, 'Mars/Base')"))).resolves.toBeTruthy();
+    });
+
+    it("requires sign-in for swipes", async () => {
+      const ids = await seedFeed();
+      await expect(db.query("select public.record_swipe($1, 'apply')", [ids.berlin])).rejects.toThrow(/sign in required/);
+    });
+  });
 });

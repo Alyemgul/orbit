@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo } from "@/components/brand/logo";
+import { ToastProvider } from "@/components/ui/toast";
 import { BottomTabs } from "./bottom-tabs";
 import { SideNav } from "./side-nav";
 
@@ -13,6 +14,7 @@ interface AppShellProps {
 
 export function AppShell({ email, backendConfigured, children }: AppShellProps) {
   return (
+    <ToastProvider>
     <div className="min-h-dvh">
       <SideNav email={email} />
 
@@ -35,5 +37,6 @@ export function AppShell({ email, backendConfigured, children }: AppShellProps) 
 
       <BottomTabs />
     </div>
+    </ToastProvider>
   );
 }

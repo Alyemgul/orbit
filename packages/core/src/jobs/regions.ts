@@ -22,6 +22,11 @@ const REGION_OF = new Map<string, Region>(
   Object.entries(COUNTRIES_BY_REGION).flatMap(([region, codes]) => codes.map((code) => [code, region as Region])),
 );
 
+/** ISO country codes in a region. */
+export function countriesInRegion(region: Region): readonly string[] {
+  return COUNTRIES_BY_REGION[region];
+}
+
 export function regionOf(countryCode: string): Region | null {
   return REGION_OF.get(countryCode.toUpperCase()) ?? null;
 }

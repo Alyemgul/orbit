@@ -57,7 +57,8 @@ export const ENTRY_STATUSES = ["saved", "queued", "applied"] as const satisfies 
 export const APPLICATION_TRANSITIONS: Readonly<Record<ApplicationStatus, readonly ApplicationStatus[]>> = {
   // "applied" is allowed directly for jobs the user applied to outside Orbit.
   saved: ["queued", "applied", "archived"],
-  queued: ["tailoring", "failed", "archived"],
+  // "applied" covers applying by hand before the autopilot gets to it.
+  queued: ["tailoring", "failed", "applied", "archived"],
   tailoring: ["ready", "failed", "archived"],
   // "ready" is where review-before-send mode parks an application.
   ready: ["submitting", "applied", "archived"],
