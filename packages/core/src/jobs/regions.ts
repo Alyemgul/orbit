@@ -31,6 +31,7 @@ const REGION_WORDS: readonly (readonly [RegExp, Region | "anywhere"])[] = [
   [/\b(worldwide|global(ly)?|anywhere|international)\b/i, "anywhere"],
   [/\b(europe(an)?|emea|eu|eea|cet|cest)\b/i, "europe"],
   [/\b(asia|apac|asia[- ]pacific|middle east|mena)\b/i, "asia"],
+  [/\b(australia|oceania|anz|new zealand)\b/i, "oceania"],
   [/\b(us|usa|u\.s\.|united states|north america|americas|latam|latin america|canada)\b/i, "americas"],
 ];
 

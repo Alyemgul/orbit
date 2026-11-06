@@ -1,5 +1,6 @@
--- Orbit database setup: paste this whole file into Supabase SQL Editor and click Run.
--- Generated from supabase/migrations. Run it once on an empty project.
+-- Orbit database setup for a NEW, empty Supabase project: paste into SQL Editor and Run.
+-- Existing projects: run only the migration files you haven't run yet.
+-- Generated from supabase/migrations.
 
 begin;
 
@@ -586,3 +587,14 @@ revoke execute on function public.applications_validate() from public, anon, aut
 revoke execute on function public.applications_log_event() from public, anon, authenticated;
 
 commit;
+
+-- Enum additions must run outside the transaction above.
+
+-- ===== migrations/20261106000000_job_categories_quant_business.sql =====
+-- Orbit 0003: categories for CS-skilled roles outside pure software.
+--   quant         : quant developer/researcher, trading engineer, trader
+--   tech_business : technology analyst, consultant, solutions/implementation, forward deployed
+-- Values are appended (Postgres enums only grow at the end); mirrors packages/core JOB_CATEGORIES.
+
+alter type public.job_category add value if not exists 'quant';
+alter type public.job_category add value if not exists 'tech_business';

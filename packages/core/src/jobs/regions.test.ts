@@ -50,6 +50,9 @@ describe("student roles", () => {
     ["Software Engineer Co-op", "intern"],
     ["Software Engineer, New Grad 2027", "entry"],
     ["University Graduate - Backend", "entry"],
+    ["Technology Graduate Programme 2027", "entry"],
+    ["Summer Analyst - Technology", "intern"],
+    ["Off-Cycle Software Engineering Internship", "intern"],
   ] as const)("%s is %s", (title, level) => {
     expect(inferExperienceLevel(title)).toBe(level);
   });

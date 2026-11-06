@@ -15,7 +15,7 @@ const ALPHA3_TO_ALPHA2: Record<string, string> = {
   AUT: "AT", CHE: "CH", BEL: "BE", LUX: "LU", SWE: "SE", DNK: "DK", FIN: "FI", NOR: "NO", CZE: "CZ",
   ROU: "RO", PRT: "PT", GRC: "GR", USA: "US", CAN: "CA", IND: "IN", ISR: "IL", ARE: "AE",
   SGP: "SG", JPN: "JP", KOR: "KR", HKG: "HK", TWN: "TW", VNM: "VN", MYS: "MY", CHN: "CN", PHL: "PH",
-  IDN: "ID", THA: "TH", SAU: "SA",
+  IDN: "ID", THA: "TH", SAU: "SA", AUS: "AU", NZL: "NZ",
 };
 
 const jobSchema = z.object({

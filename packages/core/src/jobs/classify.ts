@@ -22,6 +22,7 @@ function firstMatch<T>(text: string, rules: readonly Rule<T>[], fallback: T): T 
 }
 
 const LEVEL_RULES: readonly Rule<ExperienceLevel>[] = [
+  [/\b(summer (analyst|associate|intern(ship)?)|off[- ]cycle|spring (week|insight)|insight (week|programme|program))\b/i, "intern"],
   [/\b(intern|internship|co-?op|praktikant(in)?|praktikum|werkstudent(in)?|working student|student|apprentice(ship)?|stagiaire|stage|thesis|abschlussarbeit|masterarbeit|bachelorarbeit)\b/i, "intern"],
   [/\b(staff|principal|distinguished|head of|director|vp|vice president|engineering manager|architect)\b/i, "lead"],
   [/\b(lead|team lead|tech lead)\b/i, "lead"],
@@ -35,6 +36,7 @@ export function inferExperienceLevel(title: string): ExperienceLevel {
 }
 
 const CATEGORY_RULES: readonly Rule<JobCategory>[] = [
+  [/\b(quant(itative)?(\s+(developer|dev|researcher|research|trader|trading|analyst|analysis|engineer|strategist|software))?|algorithmic trad(ing|er)|algo trad(ing|er)|trading (engineer|developer|systems|technologist)|low[- ]latency|market mak(ing|er)|trader)\b/i, "quant"],
   [/\b(machine learning|ml|ai|artificial intelligence|deep learning|llm|nlp|computer vision|research scientist|applied scientist|mlops)\b/i, "ml_ai"],
   [/\b(data (engineer|scientist|science|analyst|analytics|architect|platform)|analytics engineer|business intelligence|bi (developer|engineer|analyst)|data warehouse)\b/i, "data"],
   [/\b(security|secops|appsec|devsecops|penetration|pentest|cyber|soc analyst)\b/i, "security"],
@@ -43,6 +45,8 @@ const CATEGORY_RULES: readonly Rule<JobCategory>[] = [
   [/\b(designer|ux|ui\/ux|product design|interaction design)\b/i, "design"],
   [/\b(product (manager|owner|lead)|technical program manager|tpm)\b/i, "product"],
   [/\b(it support|helpdesk|help desk|service desk|system administrator|sysadmin|it specialist|desktop support)\b/i, "it_support"],
+  // Roles that use CS skills in business: analysts, consultants, solutions and implementation work.
+  [/\b(business analyst|technology analyst|tech(nology)? consultant|it consultant|technology graduate|solutions? (engineer|architect|consultant)|implementation (engineer|consultant|specialist)|technical account manager|product analyst|systems analyst|it analyst|digital analyst|technology risk|it audit(or)?|forward deployed)\b/i, "tech_business"],
   // Non-engineering roles that happen to say "engineer" or "developer".
   [/\b(sales|account executive|account manager|business development|recruit(er|ing)|marketing|finance|accountant|legal|counsel|customer success|people partner)\b/i, "other"],
   [/\b(software|developer|engineer(ing)?|programmer|frontend|front-end|backend|back-end|full[- ]?stack|mobile|ios|android|web|swe|entwickler(in)?|développeur)\b/i, "software_engineering"],

@@ -1,4 +1,5 @@
 import { scopeDecision, type JobUpsert, type ScopeRule, type SourceRunStatus } from "@orbit/core";
+import { ZodError } from "zod";
 import { mapLimit, type HttpClient } from "./http";
 import { normalizeJob, toUpsertRow } from "./normalize";
 import type { WatchedBoard } from "./sources";
@@ -58,6 +59,11 @@ interface FetchOutcome {
 }
 
 function errorMessage(error: unknown): string {
+  // Zod errors serialize as JSON; keep the first issue readable in the run log.
+  if (error instanceof ZodError) {
+    const issue = error.issues[0];
+    return `unexpected response format${issue ? ` at ${issue.path.join(".") || "root"}: ${issue.message}` : ""}`;
+  }
   return (error instanceof Error ? error.message : String(error)).slice(0, 500);
 }
 

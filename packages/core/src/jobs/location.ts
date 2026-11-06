@@ -54,7 +54,8 @@ const CITIES: Record<string, string> = {
   "palo alto": "US", "menlo park": "US", sunnyvale: "US", "san jose": "US", "washington, dc": "US",
   bellevue: "US", redmond: "US", "san diego": "US", portland: "US", "salt lake city": "US", miami: "US",
   bangalore: "IN", bengaluru: "IN", hyderabad: "IN", pune: "IN", mumbai: "IN", "new delhi": "IN",
-  tokyo: "JP", seoul: "KR", sydney: "AU", melbourne: "AU", "são paulo": "BR", "sao paulo": "BR",
+  tokyo: "JP", osaka: "JP", kyoto: "JP", fukuoka: "JP", yokohama: "JP", seoul: "KR", pangyo: "KR", busan: "KR",
+  sydney: "AU", melbourne: "AU", brisbane: "AU", perth: "AU", canberra: "AU", adelaide: "AU", auckland: "NZ", "são paulo": "BR", "sao paulo": "BR",
   "mexico city": "MX", "buenos aires": "AR",
 };
 

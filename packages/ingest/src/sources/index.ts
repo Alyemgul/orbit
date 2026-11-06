@@ -4,6 +4,7 @@ import { amazonSource } from "./amazon";
 import { ashbySource } from "./ashby";
 import { greenhouseSource } from "./greenhouse";
 import { leverSource } from "./lever";
+import { myCareersFutureSource } from "./mycareersfuture";
 import { recruiteeSource } from "./recruitee";
 import { smartRecruitersSource } from "./smartrecruiters";
 import type { Source } from "./types";
@@ -68,6 +69,7 @@ export function buildSources(config: IngestConfig, options: BuildOptions = {}): 
   if (includeAggregators) {
     if (config.arbeitnow) add(arbeitnowSource(config.arbeitnow));
     if (config.remotive) add(remotiveSource(config.remotive));
+    if (config.myCareersFuture) add(myCareersFutureSource(config.myCareersFuture));
     if (config.adzuna && adzunaCredentials) add(adzunaSource({ ...config.adzuna, ...adzunaCredentials }));
   }
 
