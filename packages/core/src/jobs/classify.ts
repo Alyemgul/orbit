@@ -36,7 +36,7 @@ export function inferExperienceLevel(title: string): ExperienceLevel {
 
 const CATEGORY_RULES: readonly Rule<JobCategory>[] = [
   [/\b(machine learning|ml|ai|artificial intelligence|deep learning|llm|nlp|computer vision|research scientist|applied scientist|mlops)\b/i, "ml_ai"],
-  [/\b(data (engineer|scientist|analyst|architect|platform)|analytics engineer|business intelligence|bi (developer|engineer|analyst)|data warehouse)\b/i, "data"],
+  [/\b(data (engineer|scientist|science|analyst|analytics|architect|platform)|analytics engineer|business intelligence|bi (developer|engineer|analyst)|data warehouse)\b/i, "data"],
   [/\b(security|secops|appsec|devsecops|penetration|pentest|cyber|soc analyst)\b/i, "security"],
   [/\b(devops|sre|site reliability|platform engineer(ing)?|infrastructure|cloud (engineer|architect)|kubernetes|systems engineer)\b/i, "devops_sre"],
   [/\b(qa|quality assurance|sdet|test automation|(software )?test(ing)? engineer)\b/i, "qa"],

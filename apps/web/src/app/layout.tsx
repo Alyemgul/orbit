@@ -29,7 +29,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     // data-theme is set by the init script before hydration.
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {/* Some browser extensions rewrite head scripts before hydration; ignore that drift. */}
+        <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="font-sans antialiased">{children}</body>
     </html>

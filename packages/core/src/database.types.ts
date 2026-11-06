@@ -30,7 +30,7 @@ type Table<Row, RequiredOnInsert extends keyof Row> = {
   Relationships: [];
 };
 
-export interface ProfileRow {
+export type ProfileRow = {
   user_id: string;
   full_name: string | null;
   email: string;
@@ -43,9 +43,9 @@ export interface ProfileRow {
   review_before_send: boolean;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface JobRow {
+export type JobRow = {
   id: string;
   dedupe_hash: string;
   source: string;
@@ -74,12 +74,12 @@ export interface JobRow {
   last_seen_at: string;
   closed_at: string | null;
   search: unknown;
-}
+};
 
 /** A job as sent to ingest_upsert_jobs. */
 export type JobUpsert = Omit<JobRow, "id" | "first_seen_at" | "last_seen_at" | "closed_at" | "search">;
 
-export interface SourceRunRow {
+export type SourceRunRow = {
   id: number;
   source: string;
   status: SourceRunStatus;
@@ -90,24 +90,24 @@ export interface SourceRunRow {
   closed: number;
   invalid: number;
   error: string | null;
-}
+};
 
-export interface WatchedCompanyRow {
+export type WatchedCompanyRow = {
   user_id: string;
   ats_type: Extract<AtsType, "greenhouse" | "lever" | "ashby" | "smartrecruiters" | "recruitee">;
   board_token: string;
   company_name: string;
   created_at: string;
-}
+};
 
-export interface SwipeRow {
+export type SwipeRow = {
   user_id: string;
   job_id: string;
   decision: SwipeDecision;
   created_at: string;
-}
+};
 
-export interface ResumeRow {
+export type ResumeRow = {
   id: string;
   user_id: string;
   title: string;
@@ -115,9 +115,9 @@ export interface ResumeRow {
   content: Json;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface ApplicationRow {
+export type ApplicationRow = {
   id: string;
   user_id: string;
   job_id: string;
@@ -130,9 +130,9 @@ export interface ApplicationRow {
   updated_by: EventActor;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface ResumeVariantRow {
+export type ResumeVariantRow = {
   id: string;
   user_id: string;
   application_id: string;
@@ -143,9 +143,9 @@ export interface ResumeVariantRow {
   missing_keywords: string[];
   pdf_path: string | null;
   created_at: string;
-}
+};
 
-export interface ScreeningAnswerRow {
+export type ScreeningAnswerRow = {
   id: string;
   user_id: string;
   question_hash: string;
@@ -154,14 +154,14 @@ export interface ScreeningAnswerRow {
   is_sensitive: boolean;
   created_at: string;
   updated_at: string;
-}
+};
 
-export interface ApplicationTransitionRow {
+export type ApplicationTransitionRow = {
   from_status: ApplicationStatus;
   to_status: ApplicationStatus;
-}
+};
 
-export interface ApplicationEventRow {
+export type ApplicationEventRow = {
   id: number;
   application_id: string;
   user_id: string;
@@ -171,9 +171,9 @@ export interface ApplicationEventRow {
   actor: EventActor;
   payload: Json;
   created_at: string;
-}
+};
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       profiles: Table<ProfileRow, "user_id" | "email">;
@@ -210,4 +210,4 @@ export interface Database {
     };
     CompositeTypes: { [_ in never]: never };
   };
-}
+};

@@ -10,7 +10,8 @@
     "build": "npm run build -w @orbit/web",
     "start": "npm run start -w @orbit/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "ingest": "npm run ingest -w @orbit/ingest --"
   },
   "engines": {
     "node": ">=20.11"

@@ -56,6 +56,7 @@ describe("classifiers", () => {
     ["Machine Learning Engineer", "ml_ai"],
     ["AI Platform Engineer", "ml_ai"],
     ["Data Engineer", "data"],
+    ["Data Science Manager, Risk", "data"],
     ["Site Reliability Engineer", "devops_sre"],
     ["Application Security Engineer", "security"],
     ["Sales Engineer", "other"],
@@ -93,6 +94,10 @@ describe("inferCountryCodes", () => {
     ["New York, NY", ["US"]],
     ["Munich or Budapest", ["DE", "HU"]],
     ["Milan, Metropolitan City of Milan, Italy", ["IT"]],
+    ["Maryland; Virginia; Washington, D.C.", ["US"]],
+    ["Bellevue, Washington", ["US"]],
+    ["Remote - Texas", ["US"]],
+    ["Costa Rica", ["CR"]],
     ["Remote, Global", []],
     ["", []],
   ] as const)("%s -> %j", (location, codes) => {

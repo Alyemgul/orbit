@@ -19,7 +19,19 @@ const COUNTRY_NAMES: Record<string, string> = {
   india: "IN", china: "CN", japan: "JP", "south korea": "KR", korea: "KR", singapore: "SG",
   "hong kong": "HK", taiwan: "TW", australia: "AU", "new zealand": "NZ", "south africa": "ZA",
   egypt: "EG", nigeria: "NG", kenya: "KE", philippines: "PH", indonesia: "ID", vietnam: "VN",
-  thailand: "TH", malaysia: "MY",
+  thailand: "TH", malaysia: "MY", "costa rica": "CR", peru: "PE", uruguay: "UY", "saudi arabia": "SA",
+  qatar: "QA", pakistan: "PK", bangladesh: "BD", "sri lanka": "LK",
+  // US states spelled out. "Georgia" and "Washington" are left out: both are ambiguous
+  // (the country / the city of Washington is covered by "washington, d.c." below).
+  alabama: "US", alaska: "US", arizona: "US", arkansas: "US", california: "US", colorado: "US",
+  connecticut: "US", delaware: "US", florida: "US", hawaii: "US", idaho: "US", illinois: "US",
+  indiana: "US", iowa: "US", kansas: "US", kentucky: "US", louisiana: "US", maine: "US", maryland: "US",
+  massachusetts: "US", michigan: "US", minnesota: "US", mississippi: "US", missouri: "US", montana: "US",
+  nebraska: "US", nevada: "US", "new hampshire": "US", "new jersey": "US", "new mexico": "US",
+  "north carolina": "US", "north dakota": "US", ohio: "US", oklahoma: "US", oregon: "US",
+  pennsylvania: "US", "rhode island": "US", "south carolina": "US", "south dakota": "US", tennessee: "US",
+  texas: "US", utah: "US", vermont: "US", virginia: "US", "west virginia": "US", wisconsin: "US",
+  wyoming: "US", "washington, d.c.": "US", "washington d.c.": "US", "washington state": "US",
 };
 
 const CITIES: Record<string, string> = {
@@ -40,6 +52,7 @@ const CITIES: Record<string, string> = {
   "new york": "US", "san francisco": "US", seattle: "US", austin: "US", boston: "US", chicago: "US",
   "los angeles": "US", denver: "US", atlanta: "US", "santa clara": "US", "mountain view": "US",
   "palo alto": "US", "menlo park": "US", sunnyvale: "US", "san jose": "US", "washington, dc": "US",
+  bellevue: "US", redmond: "US", "san diego": "US", portland: "US", "salt lake city": "US", miami: "US",
   bangalore: "IN", bengaluru: "IN", hyderabad: "IN", pune: "IN", mumbai: "IN", "new delhi": "IN",
   tokyo: "JP", seoul: "KR", sydney: "AU", melbourne: "AU", "são paulo": "BR", "sao paulo": "BR",
   "mexico city": "MX", "buenos aires": "AR",
