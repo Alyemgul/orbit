@@ -9,6 +9,11 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    # Major versions (Next 16, TypeScript 7, ...) contain breaking changes and are
+    # upgraded deliberately, not by bot. Security fixes still arrive as patches.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
