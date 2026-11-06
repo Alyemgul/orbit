@@ -1,0 +1,18 @@
+{
+  "name": "orbit",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @orbit/web",
+    "build": "npm run build -w @orbit/web",
+    "start": "npm run start -w @orbit/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.11"
+  }
+}
