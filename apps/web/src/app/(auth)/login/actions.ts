@@ -44,7 +44,8 @@ export async function requestMagicLink(_prev: LoginState, formData: FormData): P
 
   const { email } = parsed.data;
   if (!isEmailAllowed(email)) {
-    return { status: "error", message: "This email isn't on the invite list. Ask the owner to add you." };
+    // Same response as success: don't reveal the invite list.
+    return { status: "sent", email };
   }
 
   const next = safeRedirectPath(parsed.data.next);
@@ -54,15 +55,22 @@ export async function requestMagicLink(_prev: LoginState, formData: FormData): P
     email,
     options: {
       emailRedirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(next)}`,
-      shouldCreateUser: true,
+      // Invite-only: accounts are created by the owner in the Supabase dashboard.
+      // Public sign-up is also disabled there, so this is enforced server-side too.
+      shouldCreateUser: false,
     },
   });
 
   if (error) {
-    console.error("signInWithOtp failed:", error.status, error.message);
     if (error.status === 429) {
       return { status: "error", message: "Too many sign-in emails. Wait a minute and try again." };
     }
+    // Unknown email: answer exactly as for a known one, so the form can't be
+    // used to discover who has an account.
+    if (error.code === "otp_disabled" || error.code === "signup_disabled" || error.code === "user_not_found") {
+      return { status: "sent", email };
+    }
+    console.error("signInWithOtp failed:", error.status, error.code, error.message);
     return { status: "error", message: "Couldn't send the sign-in link. Try again shortly." };
   }
 

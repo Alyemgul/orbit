@@ -19,8 +19,8 @@ export function LoginForm({ next, disabled }: { next: string; disabled: boolean 
         </div>
         <p className="font-medium">Check your inbox</p>
         <p className="text-sm text-muted">
-          We sent a sign-in link to <span className="font-medium text-text">{state.email}</span>. Open it on this
-          device.
+          If <span className="font-medium text-text">{state.email}</span> has an Orbit invite, a sign-in link is on
+          its way. Open it on this device.
         </p>
       </div>
     );
