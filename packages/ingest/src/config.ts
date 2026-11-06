@@ -4,6 +4,7 @@
  * those are merged in at run time.
  */
 
+import type { ScopeRule } from "@orbit/core";
 import type { AmazonConfig } from "./sources/amazon";
 import type { SmartRecruitersConfig } from "./sources/smartrecruiters";
 import type { WorkdayConfig } from "./sources/workday";
@@ -15,10 +16,15 @@ export interface IngestConfig {
   recruitee: { token: string; name: string }[];
   smartrecruiters: SmartRecruitersConfig[];
   workday: WorkdayConfig[];
-  amazon: AmazonConfig | null;
+  amazon: AmazonConfig[];
   arbeitnow: { maxPages: number } | null;
   remotive: { categories?: string[] } | null;
   adzuna: { countries: string[]; what: string; pagesPerCountry: number } | null;
+  /**
+   * Only jobs in these regions are stored, plus visa-sponsored jobs anywhere.
+   * Owner's search: Europe and Asia (internships welcome).
+   */
+  scope: ScopeRule;
   /** Closed jobs nobody applied to are deleted after this many days. */
   retentionDays: number;
   /** Sources fetched in parallel. */
@@ -77,14 +83,24 @@ export const DEFAULT_CONFIG: IngestConfig = {
     { name: "Salesforce", host: "salesforce.wd12.myworkdayjobs.com", tenant: "salesforce", site: "External_Career_Site", searchText: "software engineer", max: 150 },
     { name: "Workday", host: "workday.wd5.myworkdayjobs.com", tenant: "workday", site: "Workday", searchText: "software engineer", max: 100 },
   ],
-  amazon: {
-    countries: ["DEU", "GBR", "IRL", "NLD", "FRA", "ESP", "ITA", "POL", "HUN", "AUT", "CZE", "ROU", "LUX"],
-    categories: ["software-development"],
-    max: 400,
-  },
+  amazon: [
+    {
+      id: "europe",
+      countries: ["DEU", "GBR", "IRL", "NLD", "FRA", "ESP", "ITA", "POL", "HUN", "AUT", "CZE", "ROU", "LUX"],
+      categories: ["software-development"],
+      max: 400,
+    },
+    {
+      id: "asia",
+      countries: ["SGP", "JPN", "IND", "KOR", "HKG", "TWN", "VNM", "MYS", "ARE", "ISR"],
+      categories: ["software-development"],
+      max: 400,
+    },
+  ],
   arbeitnow: { maxPages: 3 },
   remotive: {},
   adzuna: { countries: ["de", "gb", "nl", "fr", "at", "pl"], what: "software engineer", pagesPerCountry: 2 },
+  scope: { regions: ["europe", "asia"], keepIfVisaSponsored: true, keepUnknownLocation: true },
   retentionDays: 30,
   concurrency: 4,
   sourceTimeoutMs: 180_000,

@@ -40,7 +40,7 @@ export function buildSources(config: IngestConfig, options: BuildOptions = {}): 
   config.recruitee.forEach((c) => add(recruiteeSource(c)));
   config.smartrecruiters.forEach((c) => add(smartRecruitersSource(c)));
   config.workday.forEach((c) => add(workdaySource(c)));
-  if (config.amazon) add(amazonSource(config.amazon));
+  config.amazon.forEach((c) => add(amazonSource(c)));
 
   for (const board of watched) {
     // The database already constrains tokens; re-check because they become URL parts.

@@ -80,6 +80,7 @@ async function main(): Promise<number> {
     concurrency: DEFAULT_CONFIG.concurrency,
     sourceTimeoutMs: DEFAULT_CONFIG.sourceTimeoutMs,
     retentionDays: DEFAULT_CONFIG.retentionDays,
+    scope: DEFAULT_CONFIG.scope,
   });
 
   console.table(
@@ -90,6 +91,7 @@ async function main(): Promise<number> {
       upserted: run.upserted,
       closed: run.closed,
       invalid: run.invalid,
+      outOfScope: run.outOfScope,
       error: run.error?.slice(0, 60) ?? "",
     })),
   );

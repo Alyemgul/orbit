@@ -22,11 +22,11 @@ function firstMatch<T>(text: string, rules: readonly Rule<T>[], fallback: T): T 
 }
 
 const LEVEL_RULES: readonly Rule<ExperienceLevel>[] = [
-  [/\b(intern|internship|praktikant(in)?|praktikum|werkstudent(in)?|working student|apprentice(ship)?|stagiaire|stage)\b/i, "intern"],
+  [/\b(intern|internship|co-?op|praktikant(in)?|praktikum|werkstudent(in)?|working student|student|apprentice(ship)?|stagiaire|stage|thesis|abschlussarbeit|masterarbeit|bachelorarbeit)\b/i, "intern"],
   [/\b(staff|principal|distinguished|head of|director|vp|vice president|engineering manager|architect)\b/i, "lead"],
   [/\b(lead|team lead|tech lead)\b/i, "lead"],
   [/\b(senior|sr\.?|expert)\b|\b(iii|iv)\s*$/i, "senior"],
-  [/\b(junior|jr\.?|graduate|new grad|entry[- ]level|early career|trainee)\b|\b(engineer|developer|analyst)\s+i\b/i, "entry"],
+  [/\b(junior|jr\.?|graduate|new grad(uate)?|entry[- ]level|early career|university grad(uate)?|campus|trainee)\b|\b(engineer|developer|analyst)\s+i\b/i, "entry"],
   [/\b(mid[- ]level|intermediate)\b|\b(engineer|developer|analyst)\s+ii\b/i, "mid"],
 ];
 

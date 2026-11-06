@@ -1,4 +1,4 @@
-import type { JobUpsert, SourceRunStatus } from "@orbit/core";
+import { scopeDecision, type JobUpsert, type ScopeRule, type SourceRunStatus } from "@orbit/core";
 import { mapLimit, type HttpClient } from "./http";
 import { normalizeJob, toUpsertRow } from "./normalize";
 import type { WatchedBoard } from "./sources";
@@ -12,6 +12,8 @@ export interface SourceRunRecord {
   upserted: number;
   closed: number;
   invalid: number;
+  /** Valid postings dropped by the scope rule (not stored in the run log). */
+  outOfScope: number;
   error: string | null;
 }
 
@@ -32,6 +34,8 @@ export interface RunOptions {
   concurrency: number;
   sourceTimeoutMs: number;
   retentionDays: number;
+  /** Which jobs are worth storing; omit to keep everything. */
+  scope?: ScopeRule;
   /** Rows per database call; keeps request bodies well under limits. */
   batchSize?: number;
 }
@@ -49,6 +53,7 @@ interface FetchOutcome {
   rows: JobUpsert[];
   fetched: number;
   invalid: number;
+  outOfScope: number;
   error: string | null;
 }
 
@@ -74,17 +79,19 @@ async function fetchSource(source: Source, options: RunOptions): Promise<FetchOu
     ]);
     const rows: JobUpsert[] = [];
     let invalid = 0;
+    let outOfScope = 0;
     for (const item of raw) {
       const result = normalizeJob(item, source);
-      if (result.ok) rows.push(toUpsertRow(result.job));
-      else invalid++;
+      if (!result.ok) invalid++;
+      else if (options.scope && scopeDecision(result.job, options.scope) === "out_of_scope") outOfScope++;
+      else rows.push(toUpsertRow(result.job));
     }
     if (invalid > 0) options.log.warn(`${source.id}: skipped ${invalid} invalid posting(s)`);
-    return { source, startedAt, rows, fetched: raw.length, invalid, error: null };
+    return { source, startedAt, rows, fetched: raw.length, invalid, outOfScope, error: null };
   } catch (error) {
     const message = controller.signal.aborted ? errorMessage(controller.signal.reason) : errorMessage(error);
     options.log.error(`${source.id}: ${message}`);
-    return { source, startedAt, rows: [], fetched: 0, invalid: 0, error: message };
+    return { source, startedAt, rows: [], fetched: 0, invalid: 0, outOfScope: 0, error: message };
   } finally {
     clearTimeout(timer);
   }
@@ -163,6 +170,7 @@ export async function runIngest(options: RunOptions): Promise<IngestSummary> {
       upserted: upserted.get(id) ?? 0,
       closed,
       invalid: outcome.invalid,
+      outOfScope: outcome.outOfScope,
       error,
     };
     runs.push(record);

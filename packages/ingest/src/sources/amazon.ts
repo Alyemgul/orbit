@@ -14,6 +14,8 @@ const ALPHA3_TO_ALPHA2: Record<string, string> = {
   DEU: "DE", GBR: "GB", IRL: "IE", NLD: "NL", FRA: "FR", ESP: "ES", ITA: "IT", POL: "PL", HUN: "HU",
   AUT: "AT", CHE: "CH", BEL: "BE", LUX: "LU", SWE: "SE", DNK: "DK", FIN: "FI", NOR: "NO", CZE: "CZ",
   ROU: "RO", PRT: "PT", GRC: "GR", USA: "US", CAN: "CA", IND: "IN", ISR: "IL", ARE: "AE",
+  SGP: "SG", JPN: "JP", KOR: "KR", HKG: "HK", TWN: "TW", VNM: "VN", MYS: "MY", CHN: "CN", PHL: "PH",
+  IDN: "ID", THA: "TH", SAU: "SA",
 };
 
 const jobSchema = z.object({
@@ -33,6 +35,8 @@ const jobSchema = z.object({
 const responseSchema = z.object({ hits: z.number().nullish(), jobs: z.array(jobSchema) });
 
 export interface AmazonConfig {
+  /** Distinguishes several Amazon searches, e.g. "europe" and "asia". */
+  id: string;
   /** ISO alpha-3 codes, as amazon.jobs uses them. */
   countries: string[];
   /** amazon.jobs category facets, e.g. "software-development". */
@@ -46,10 +50,10 @@ function qualificationsHtml(title: string, value: string | null | undefined): st
   return value ? `<h3>${title}</h3><p>${value}</p>` : "";
 }
 
-export function amazonSource({ countries, categories = [], query = "", max = 400 }: AmazonConfig): Source {
+export function amazonSource({ id, countries, categories = [], query = "", max = 400 }: AmazonConfig): Source {
   return {
-    id: "amazon",
-    label: "Amazon (amazon.jobs)",
+    id: `amazon:${id}`,
+    label: `Amazon ${id} (amazon.jobs)`,
     priority: PRIORITY.companyBoard,
     async fetchJobs({ http, signal }) {
       const jobs: RawJob[] = [];

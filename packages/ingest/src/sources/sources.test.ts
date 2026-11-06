@@ -188,7 +188,7 @@ describe("amazon", () => {
         ],
       },
     });
-    const [job] = await amazonSource({ countries: ["DEU"], categories: ["software-development"] }).fetchJobs(ctx(http));
+    const [job] = await amazonSource({ id: "europe", countries: ["DEU"], categories: ["software-development"] }).fetchJobs(ctx(http));
     const url = new URL(calls[0]!.url);
     expect(url.searchParams.getAll("normalized_country_code[]")).toEqual(["DEU"]);
     expect(url.searchParams.get("result_limit")).toBe("100");
