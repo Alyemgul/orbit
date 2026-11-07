@@ -102,3 +102,29 @@
     }
   }
 }
+
+/* Printing (Save as PDF) shows only the resume rendered by <PrintableResume>. */
+.orbit-print-root {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 16mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color-scheme: light;
+  }
+
+  body > *:not(.orbit-print-root) {
+    display: none !important;
+  }
+
+  .orbit-print-root {
+    display: block;
+  }
+}

@@ -142,6 +142,18 @@ export type ResumeVariantRow = {
   match_score: number | null;
   missing_keywords: string[];
   pdf_path: string | null;
+  /** The rewrites and hidden bullets the version was built from. */
+  inputs: Json;
+  source: "rules" | "ai";
+  /** The master's updated_at when this version was made. */
+  base_updated_at: string | null;
+  created_at: string;
+};
+
+export type LlmCallRow = {
+  id: number;
+  user_id: string;
+  kind: "tailor" | "import";
   created_at: string;
 };
 
@@ -211,6 +223,7 @@ export type Database = {
       screening_answers: Table<ScreeningAnswerRow, "question_hash" | "question_text" | "answer">;
       application_transitions: Table<ApplicationTransitionRow, "from_status" | "to_status">;
       application_events: Table<ApplicationEventRow, never>;
+      llm_calls: Table<LlmCallRow, "user_id" | "kind">;
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -222,6 +235,21 @@ export type Database = {
       undo_swipe: { Args: { p_job_id: string }; Returns: undefined };
       my_pipeline: { Args: Record<PropertyKey, never>; Returns: PipelineItem[] };
       my_activity: { Args: { p_days?: number; p_time_zone?: string }; Returns: ActivityDay[] };
+      save_master_resume: { Args: { p_content: Json }; Returns: { id: string; updated_at: string }[] };
+      save_resume_variant: {
+        Args: {
+          p_application_id: string;
+          p_content: Json;
+          p_inputs: Json;
+          p_diff: Json;
+          p_match_score: number | null;
+          p_missing_keywords: string[];
+          p_source: "rules" | "ai";
+        };
+        Returns: string;
+      };
+      claim_llm_call: { Args: { p_kind: LlmCallRow["kind"] }; Returns: boolean };
+      my_llm_usage: { Args: Record<PropertyKey, never>; Returns: { used: number; daily_limit: number }[] };
     };
     Enums: {
       ats_type: AtsType;

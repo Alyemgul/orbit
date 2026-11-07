@@ -119,8 +119,10 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
       setHistory((h) => [...h.slice(-49), { job, decision }]);
       if (decision === "apply") setBudget((b) => ({ ...b, used: b.used + 1 }));
 
+      let applicationId: string | null = null;
       if (mode === "live") {
         const result = await swipeJob(job.id, decision);
+        if (result.ok) applicationId = result.data;
         if (!result.ok) {
           // Put the card back so nothing is silently lost.
           setQueue((q) => [job, ...q]);
@@ -133,9 +135,11 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
 
       if (decision === "apply") {
         toast({
-          message: `Queued ${job.company}. Autopilot isn't connected yet, so apply on the posting for now.`,
+          message: applicationId
+            ? `Queued ${job.company}. Tailor your CV for it, then apply on the posting.`
+            : `Queued ${job.company}. Autopilot isn't connected yet, so apply on the posting for now.`,
           tone: "success",
-          action: { label: "Open", href: job.applyUrl },
+          action: applicationId ? { label: "Tailor CV", href: `/resume/tailor/${applicationId}` } : { label: "Open", href: job.applyUrl },
           durationMs: 5000,
         });
       } else if (decision === "save") {

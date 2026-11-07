@@ -74,8 +74,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 toast.action.href ? (
                   <a
                     href={toast.action.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    // Only links to other sites open a new tab.
+                    {...(/^https?:/.test(toast.action.href) ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                     className="shrink-0 font-medium text-accent hover:underline"
                   >
                     {toast.action.label}

@@ -22,7 +22,8 @@ import {
   type PipelineColumnId,
   type PipelineItem,
 } from "@orbit/core";
-import { Archive, ChevronDown, ExternalLink, GripVertical, ThumbsDown } from "lucide-react";
+import { Archive, ChevronDown, ExternalLink, FileText, GripVertical, ThumbsDown } from "lucide-react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -341,6 +342,9 @@ interface CardBodyProps {
   lifted?: boolean;
 }
 
+/** Statuses where a tailored resume can still matter. */
+const TAILORABLE = new Set<ApplicationStatus>(["saved", "queued", "tailoring", "ready", "needs_input", "failed"]);
+
 function CardBody({ item, onMove, handleProps, lifted }: CardBodyProps) {
   const tone = STATUS_TONE[item.status];
   const options = nextStatuses(item.status);
@@ -391,6 +395,11 @@ function CardBody({ item, onMove, handleProps, lifted }: CardBodyProps) {
           >
             Posting <ExternalLink className="size-3" aria-hidden />
           </a>
+          {TAILORABLE.has(item.status) ? (
+            <Link href={`/resume/tailor/${item.id}`} className="inline-flex items-center gap-1 text-xs text-muted hover:text-text">
+              <FileText className="size-3" aria-hidden /> Tailor CV
+            </Link>
+          ) : null}
           {options.length ? (
             <select
               aria-label={`Move ${item.title}`}

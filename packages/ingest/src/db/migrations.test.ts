@@ -72,7 +72,9 @@ describe("database migrations", () => {
   }, 60_000);
 
   beforeEach(async () => {
-    await db.exec("delete from public.applications; delete from public.swipes; delete from public.jobs;");
+    await db.exec(
+      "delete from public.resume_variants; delete from public.resumes; delete from public.llm_calls; delete from public.applications; delete from public.swipes; delete from public.jobs;",
+    );
   });
 
   describe("schema stays in sync with packages/core", () => {
@@ -349,6 +351,79 @@ describe("database migrations", () => {
     it("requires sign-in for swipes", async () => {
       const ids = await seedFeed();
       await expect(db.query("select public.record_swipe($1, 'apply')", [ids.berlin])).rejects.toThrow(/sign in required/);
+    });
+  });
+
+  describe("resume engine", () => {
+    async function queuedApplication(userId: string): Promise<string> {
+      await upsert(db, [jobPayload()]);
+      const job = (await db.query<{ id: string }>("select id from public.jobs")).rows[0]!.id;
+      return asUser(db, userId, async () => {
+        await db.query("select public.record_swipe($1, 'apply')", [job]);
+        return (await db.query<{ id: string }>("select id from public.applications")).rows[0]!.id;
+      });
+    }
+
+    function saveVariant(application: string) {
+      return db.query<{ id: string }>(
+        "select public.save_resume_variant($1, '{\"version\":1}'::jsonb, '{}'::jsonb, '[]'::jsonb, 72.5, array['Kafka'], 'rules') as id",
+        [application],
+      );
+    }
+
+    it("keeps one master resume per user and updates it in place", async () => {
+      const first = await asUser(db, ALICE, () => db.query<{ id: string }>("select * from public.save_master_resume('{\"summary\":\"a\"}')"));
+      const second = await asUser(db, ALICE, () => db.query<{ id: string }>("select * from public.save_master_resume('{\"summary\":\"b\"}')"));
+      expect(second.rows[0]!.id).toBe(first.rows[0]!.id);
+      const rows = await db.query<{ content: { summary: string } }>("select content from public.resumes");
+      expect(rows.rows).toEqual([{ content: { summary: "b" } }]);
+      await expect(asUser(db, ALICE, () => db.query("select * from public.save_master_resume('[1]')"))).rejects.toThrow(/must be an object/);
+      await expect(db.query("select * from public.save_master_resume('{}')")).rejects.toThrow(/sign in required/);
+    });
+
+    it("saves a tailored version and moves a queued application to ready", async () => {
+      const application = await queuedApplication(ALICE);
+      await asUser(db, ALICE, () => db.query("select * from public.save_master_resume('{}')"));
+      const saved = await asUser(db, ALICE, () => saveVariant(application));
+      const row = await db.query<{ status: string; resume_variant_id: string }>("select status::text, resume_variant_id from public.applications");
+      expect(row.rows[0]).toEqual({ status: "ready", resume_variant_id: saved.rows[0]!.id });
+      const variant = await db.query<{ base_resume_id: string | null; match_score: string }>("select base_resume_id, match_score from public.resume_variants");
+      expect(variant.rows[0]!.base_resume_id).not.toBeNull();
+      const events = await db.query<{ to_status: string }>(
+        "select to_status::text from public.application_events where to_status is not null order by id",
+      );
+      expect(events.rows.map((e) => e.to_status)).toEqual(["queued", "tailoring", "ready"]);
+    });
+
+    it("refuses versions for someone else's application", async () => {
+      const application = await queuedApplication(ALICE);
+      await expect(asUser(db, BOB, () => saveVariant(application))).rejects.toThrow(/application not found/);
+      await expect(
+        asUser(db, BOB, () =>
+          db.query("insert into public.resume_variants (application_id, content) values ($1, '{}')", [application]),
+        ),
+      ).rejects.toThrow(/application not found/);
+    });
+
+    it("caps AI calls per user per day and blocks direct writes", async () => {
+      const claims = await asUser(db, ALICE, async () => {
+        const results: boolean[] = [];
+        for (let i = 0; i < 31; i++) {
+          results.push((await db.query<{ ok: boolean }>("select public.claim_llm_call('tailor') as ok")).rows[0]!.ok);
+        }
+        return results;
+      });
+      expect(claims.filter(Boolean)).toHaveLength(30);
+      expect(claims[30]).toBe(false);
+      expect((await asUser(db, BOB, () => db.query<{ ok: boolean }>("select public.claim_llm_call('tailor') as ok"))).rows[0]!.ok).toBe(true);
+
+      const usage = await asUser(db, ALICE, () => db.query<{ used: number }>("select used from public.my_llm_usage()"));
+      expect(usage.rows[0]!.used).toBe(30);
+      await expect(
+        asUser(db, ALICE, () => db.query("insert into public.llm_calls (user_id, kind) values ($1, 'tailor')", [ALICE])),
+      ).rejects.toThrow();
+      await expect(asUser(db, ALICE, () => db.query("delete from public.llm_calls"))).resolves.toBeTruthy();
+      expect((await db.query("select id from public.llm_calls")).rows).toHaveLength(31);
     });
   });
 });
