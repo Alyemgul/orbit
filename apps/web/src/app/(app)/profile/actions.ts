@@ -81,3 +81,18 @@ export async function updateAutopilotSettings(settings: unknown): Promise<Action
   revalidatePath("/profile");
   return { ok: true, data: undefined };
 }
+
+/** Deletes the account and everything in it, then signs out. Irreversible. */
+export async function deleteAccount(confirmation: unknown): Promise<ActionResult> {
+  if (confirmation !== "delete my account") return { ok: false, error: 'Type "delete my account" to confirm.' };
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Your session expired. Sign in again." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_my_account");
+  if (error) {
+    console.error(`[orbit] delete account: ${error.code} ${error.message}`);
+    return { ok: false, error: "Couldn't delete your account. Did you run migration 0008?" };
+  }
+  await supabase.auth.signOut().catch(() => undefined);
+  return { ok: true, data: undefined };
+}

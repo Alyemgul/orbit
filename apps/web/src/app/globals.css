@@ -14,9 +14,10 @@
   --accent-hover: #4a3abf;
   --accent-soft: #ecebfc;
   --accent-fg: #ffffff;
-  --success: #15803d;
+  /* Status colors meet 4.5:1 on their soft backgrounds (WCAG AA). */
+  --success: #166534;
   --success-soft: #dcfce7;
-  --warning: #a16207;
+  --warning: #92400e;
   --warning-soft: #fef3c7;
   --danger: #b91c1c;
   --danger-soft: #fee2e2;
@@ -126,5 +127,48 @@
 
   .orbit-print-root {
     display: block;
+  }
+}
+
+/* Loading placeholders: a soft sweep, or a still block with reduced motion. */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--border) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+.page-enter {
+  animation: page-enter 0.24s cubic-bezier(0.25, 0.8, 0.3, 1) both;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter {
+    animation: none;
   }
 }

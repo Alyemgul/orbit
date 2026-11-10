@@ -130,7 +130,7 @@ export function ResumeWorkspace({ mode, initial, updatedAt, versions }: ResumeWo
         )}
       </div>
 
-      <aside className="flex flex-col gap-4">
+      <aside aria-label="Resume health and tailored versions" className="flex flex-col gap-4">
         <section className="rounded-2xl border bg-surface p-4 shadow-card" aria-labelledby="health-title">
           <div className="flex items-center gap-3">
             <ProgressRing value={health.score} max={100} size={56} stroke={6} label={`Resume health ${health.score} of 100`}
@@ -174,7 +174,7 @@ export function ResumeWorkspace({ mode, initial, updatedAt, versions }: ResumeWo
             </ul>
           ) : (
             <p className="mt-1 text-xs text-muted">
-              None yet. Open a job in your <Link href="/pipeline" className="text-accent hover:underline">Pipeline</Link> and choose Tailor CV.
+              None yet. Open a job in your <Link href="/pipeline" className="text-accent underline underline-offset-2 hover:decoration-2">Pipeline</Link> and choose Tailor CV.
             </p>
           )}
         </section>

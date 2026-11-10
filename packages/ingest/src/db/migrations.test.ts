@@ -605,4 +605,61 @@ describe("database migrations", () => {
       expect(logged.rows.map((r) => r.payload.kind)).toEqual(["interview", "rejection"]);
     });
   });
+
+  describe("your data", () => {
+    const CAROL = "33333333-3333-3333-3333-333333333333";
+
+    it("exports only the caller's data, without token hashes", async () => {
+      await upsert(db, [jobPayload()]);
+      const job = (await db.query<{ id: string }>("select id from public.jobs")).rows[0]!.id;
+      await asUser(db, ALICE, async () => {
+        await db.query("select public.record_swipe($1, 'apply')", [job]);
+        await db.query("select public.create_connection_token('extension')");
+      });
+      await asUser(db, BOB, () => db.query("select public.record_swipe($1, 'save')", [job]));
+
+      const result = await asUser(db, ALICE, () => db.query<{ data: { profile: { email: string }; applications: unknown[]; swipes: unknown[]; connections: unknown[] } }>("select public.export_my_data() as data"));
+      const data = result.rows[0]!.data;
+      expect(data.profile.email).toBe("alice@example.com");
+      expect(data.applications).toHaveLength(1);
+      expect(data.applications[0]).toMatchObject({ status: "queued", job: { title: "Backend Engineer", company: "N26" } });
+      expect(data.swipes).toHaveLength(1);
+      expect(data.connections).toHaveLength(1);
+      expect(JSON.stringify(data)).not.toContain("token_hash");
+      await expect(db.query("select public.export_my_data()")).resolves.toBeTruthy();
+    });
+
+    it("deletes the account and everything that belongs to it, but not shared jobs", async () => {
+      await db.query("insert into auth.users (id, email) values ($1, 'carol@example.com')", [CAROL]);
+      await upsert(db, [jobPayload()]);
+      const job = (await db.query<{ id: string }>("select id from public.jobs")).rows[0]!.id;
+      await asUser(db, CAROL, async () => {
+        await db.query("select public.record_swipe($1, 'apply')", [job]);
+        await db.query(`select * from public.save_master_resume('{"basics":{"name":"Carol"}}')`);
+        await db.query("select public.claim_llm_call('tailor')");
+        await db.query("select public.create_connection_token('gmail')");
+      });
+      await asUser(db, BOB, () => db.query("select public.record_swipe($1, 'save')", [job]));
+
+      await asUser(db, CAROL, () => db.query("select public.delete_my_account()"));
+      for (const table of ["profiles", "applications", "swipes", "resumes", "llm_calls", "connection_tokens", "application_events"]) {
+        const rows = await db.query(`select 1 from public.${table} where user_id = $1`, [CAROL]);
+        expect(rows.rows, table).toHaveLength(0);
+      }
+      expect((await db.query("select 1 from auth.users where id = $1", [CAROL])).rows).toHaveLength(0);
+      expect((await db.query("select 1 from public.jobs where id = $1", [job])).rows).toHaveLength(1);
+      expect((await db.query("select 1 from public.applications where user_id = $1", [BOB])).rows).toHaveLength(1);
+      await expect(db.query("select public.delete_my_account()")).rejects.toThrow(/sign in required/);
+      await expect(
+        (async () => {
+          await db.exec("set role anon");
+          try {
+            await db.query("select public.delete_my_account()");
+          } finally {
+            await db.exec("reset role");
+          }
+        })(),
+      ).rejects.toThrow(/permission denied/);
+    });
+  });
 });

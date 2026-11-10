@@ -76,14 +76,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                     href={toast.action.href}
                     // Only links to other sites open a new tab.
                     {...(/^https?:/.test(toast.action.href) ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                    className="shrink-0 font-medium text-accent hover:underline"
+                    className="shrink-0 font-medium text-accent underline underline-offset-2 hover:decoration-2"
                   >
                     {toast.action.label}
                   </a>
                 ) : (
                   <button
                     type="button"
-                    className="shrink-0 font-medium text-accent hover:underline"
+                    className="shrink-0 font-medium text-accent underline underline-offset-2 hover:decoration-2"
                     onClick={() => {
                       toast.action?.onClick?.();
                       dismiss(toast.id);

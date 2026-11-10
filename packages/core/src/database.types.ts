@@ -282,6 +282,8 @@ export type Database = {
         Args: { p_call_id: number; p_application_id: string; p_base_updated_at: string; p_result: Json };
         Returns: undefined;
       };
+      export_my_data: { Args: Record<PropertyKey, never>; Returns: Json };
+      delete_my_account: { Args: Record<PropertyKey, never>; Returns: undefined };
       create_connection_token: { Args: { p_kind: ConnectionTokenRow["kind"] }; Returns: string };
       revoke_connection_token: { Args: { p_kind: ConnectionTokenRow["kind"] }; Returns: undefined };
       my_llm_usage: { Args: Record<PropertyKey, never>; Returns: { used: number; daily_limit: number }[] };

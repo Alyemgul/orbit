@@ -36,7 +36,13 @@ resume for each one, submits the application, and keeps your pipeline up to date
 - **Gmail reply tracking**: a small script in your own Google account moves applications to
   Interviewing, Offer or Rejected when companies reply. Only sender and subject reach Orbit.
 
-Still to come: polish (animations, accessibility pass, offline, data export and delete).
+- **Your data**: Profile → Your data downloads everything Orbit stores about you as one
+  JSON file, or deletes your account and all of it (shared job postings stay).
+- **Offline**: installed as an app, pages you've opened stay viewable without a connection;
+  others show an offline screen. Saved pages are cleared when you sign out.
+- **Accessibility**: keyboard-first (skip link, visible focus, keyboard swiping and a
+  "Move to" menu instead of drag), screen-reader labels, reduced-motion support, and colors
+  that meet WCAG AA contrast in light and dark. Every page passes an axe audit.
 
 ## Layout
 

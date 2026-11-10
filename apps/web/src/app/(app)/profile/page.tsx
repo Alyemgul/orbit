@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PageHeader } from "@/components/ui/page-header";
 import { ApplyCapForm } from "@/components/profile/apply-cap-form";
 import { AutopilotCard, GmailCard } from "@/components/profile/autopilot-cards";
+import { DataCard } from "@/components/profile/data-card";
 import { ProgressRing } from "@/components/stats/rings";
 import { getLlmConfig } from "@/lib/llm.server";
 import { fetchConnections } from "@/lib/inbox.server";
@@ -104,6 +105,7 @@ export default async function ProfilePage() {
           disabled={!user}
         />
         <GmailCard connection={connections.find((c) => c.kind === "gmail") ?? null} disabled={!user} />
+        <DataCard disabled={!user} />
 
 
       </div>

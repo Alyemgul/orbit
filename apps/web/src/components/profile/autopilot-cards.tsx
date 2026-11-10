@@ -211,7 +211,7 @@ export function GmailCard({ connection: initial, disabled }: { connection: Conne
             <Steps>
               <li>
                 Open{" "}
-                <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-2 hover:decoration-2">
                   script.google.com
                 </a>{" "}
                 (signed in to the Gmail you apply with).

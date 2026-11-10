@@ -31,7 +31,8 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
 
   return (
     <>
-      {/* Phones skip the header so the deck fits on one screen; the tab bar names the page. */}
+      {/* Phones skip the header so the deck fits on one screen; screen readers still get the heading. */}
+      <h1 className="sr-only md:hidden">Discover</h1>
       <PageHeader
         className="max-md:hidden"
         title="Discover"

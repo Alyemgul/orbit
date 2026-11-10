@@ -58,7 +58,11 @@ const nextConfig: NextConfig = {
   // Server Actions only accept same-origin calls (Next's default); cap body size.
   experimental: { serverActions: { bodySizeLimit: "1mb" } },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // The service worker must always be checked for updates.
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] },
+    ];
   },
 };
 

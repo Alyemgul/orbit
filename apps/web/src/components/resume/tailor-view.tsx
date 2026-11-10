@@ -71,7 +71,7 @@ export function TailorView({ mode, applicationId, job, master: initialMaster, la
         title="Add your master resume first"
         description="Tailoring starts from your master resume: it reorders and rewords what you wrote, and never adds anything."
       >
-        <Link href="/resume" className="text-sm font-medium text-accent hover:underline">Go to Resume</Link>
+        <Link href="/resume" className="text-sm font-medium text-accent underline underline-offset-2 hover:decoration-2">Go to Resume</Link>
       </EmptyState>
     );
   }
@@ -276,7 +276,7 @@ function KeywordChips({ matched, missing, optional }: { matched: string[]; missi
       {missing.length ? (
         <p className="text-xs text-muted">
           Red means the post asks for it and your resume doesn't say it. If you really have it, add it to your{" "}
-          <Link href="/resume" className="text-accent hover:underline">master resume</Link>. Orbit won't add it for you.
+          <Link href="/resume" className="text-accent underline underline-offset-2 hover:decoration-2">master resume</Link>. Orbit won't add it for you.
         </p>
       ) : null}
     </div>

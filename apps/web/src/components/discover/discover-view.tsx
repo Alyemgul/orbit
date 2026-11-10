@@ -292,7 +292,7 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
       {hiddenByMatch > 0 ? (
         <p className="-mt-2 text-xs text-muted">
           {hiddenByMatch} loaded job{hiddenByMatch > 1 ? "s" : ""} hidden below {minMatch}% match.{" "}
-          <button type="button" onClick={() => chooseMinMatch(0)} className="font-medium text-accent hover:underline">
+          <button type="button" onClick={() => chooseMinMatch(0)} className="font-medium text-accent underline underline-offset-2 hover:decoration-2">
             Show all
           </button>
         </p>
@@ -310,7 +310,7 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
             }
           >
             {historyCount ? (
-              <button type="button" onClick={() => void undo()} className="text-sm font-medium text-accent hover:underline">
+              <button type="button" onClick={() => void undo()} className="text-sm font-medium text-accent underline underline-offset-2 hover:decoration-2">
                 Undo last swipe
               </button>
             ) : null}

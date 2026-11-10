@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -23,10 +24,18 @@ export function BottomTabs() {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted",
+                  "relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted transition-colors",
                   active && "text-accent",
                 )}
               >
+                {active ? (
+                  <motion.span
+                    layoutId="tab-active"
+                    className="absolute top-0 h-0.5 w-8 rounded-full bg-accent"
+                    transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                    aria-hidden
+                  />
+                ) : null}
                 <Icon className="size-5" strokeWidth={active ? 2.4 : 2} aria-hidden />
                 {label}
               </Link>

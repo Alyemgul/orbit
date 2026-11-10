@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import type { ReactNode } from "react";
+import { ServiceWorker } from "@/components/pwa/service-worker";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -32,7 +33,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Some browser extensions rewrite head scripts before hydration; ignore that drift. */}
         <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        {children}
+        <ServiceWorker />
+      </body>
     </html>
   );
 }
