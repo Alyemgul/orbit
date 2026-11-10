@@ -3,12 +3,26 @@ import { ThemeSwitcher } from "@/components/shell/theme-switcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { ApplyCapForm } from "@/components/profile/apply-cap-form";
+import { ProgressRing } from "@/components/stats/rings";
+import { getLlmConfig } from "@/lib/llm.server";
+import { fetchLlmUsage } from "@/lib/resume.server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Profile" };
 
 export default async function ProfilePage() {
   const user = await getCurrentUser();
+  const llm = getLlmConfig();
+  const [profile, usage] = user
+    ? await Promise.all([
+        createClient().then((supabase) =>
+          supabase.from("profiles").select("daily_apply_cap").eq("user_id", user.id).maybeSingle(),
+        ),
+        fetchLlmUsage(),
+      ])
+    : [null, null];
+  const cap = profile?.data?.daily_apply_cap ?? 15;
 
   return (
     <>
@@ -31,6 +45,40 @@ export default async function ProfilePage() {
               </form>
             ) : null}
           </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Daily apply limit</CardTitle>
+            <CardDescription>
+              Right swipes past this limit are saved for later instead of queued. Up to 200.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ApplyCapForm initial={cap} disabled={!user} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>AI rewording</CardTitle>
+            <CardDescription>
+              {llm
+                ? `Using ${llm.label} (${llm.model}${llm.fallbackModel ? `, falls back to ${llm.fallbackModel}` : ""}). Repeat requests for the same job reuse earlier answers for free.`
+                : "Off. Add LLM_PROVIDER and LLM_API_KEY to apps/web/.env.local to turn it on (free providers)."}
+            </CardDescription>
+          </CardHeader>
+          {llm && usage ? (
+            <CardContent className="flex items-center gap-3">
+              <ProgressRing value={usage.used} max={usage.limit} size={48} stroke={5} label={`${usage.used} of ${usage.limit} AI rewrites used today`}>
+                <span className="text-xs font-semibold tabular-nums">{usage.used}</span>
+              </ProgressRing>
+              <p className="text-sm text-muted">
+                {usage.used} of {usage.limit} used in the last 24 hours. The free provider may run out sooner; Orbit then
+                switches to the lighter model, and tailoring without AI always works.
+              </p>
+            </CardContent>
+          ) : null}
         </Card>
 
         <Card>

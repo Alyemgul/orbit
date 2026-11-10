@@ -1,21 +1,31 @@
 "use client";
 
-import { feedFiltersToQuery, type FeedCursor, type FeedFilters, type SwipeDecision } from "@orbit/core";
+import {
+  analyzeJob,
+  feedFiltersToQuery,
+  scoreResume,
+  type FeedCursor,
+  type FeedFilters,
+  type Resume,
+  type SwipeDecision,
+} from "@orbit/core";
 import { Check, Layers, List, RotateCcw, SearchX, Star, X } from "lucide-react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { loadMoreJobs, swipeJob, undoSwipe } from "@/app/(app)/discover/actions";
 import { CompanyAvatar, JobTags } from "@/components/job/job-bits";
 import { ProgressRing } from "@/components/stats/rings";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
+import { loadDemoResume } from "@/lib/demo-resume";
 import type { FeedJob } from "@/lib/jobs/feed-job";
 import { locationLine, timeAgo } from "@/lib/jobs/format";
 import { cn } from "@/lib/utils";
 import { FilterBar } from "./filter-bar";
 import { JobDetailsDialog } from "./job-details-dialog";
+import { MatchBadge } from "./match-badge";
 import { SwipeCard, type SwipeDirection } from "./swipe-card";
 
 const DECISION: Record<SwipeDirection, SwipeDecision> = { right: "apply", up: "save", left: "skip" };
@@ -28,7 +38,12 @@ interface DiscoverViewProps {
   /** "demo" keeps everything in this tab (preview mode, no backend). */
   mode: "live" | "demo";
   budget: { used: number; cap: number };
+  /** The master resume, for match scores (null until one is saved). */
+  master: Resume | null;
 }
+
+const MATCH_STEPS = [0, 30, 50, 70] as const;
+const MATCH_KEY = "orbit-min-match";
 
 interface HistoryEntry {
   job: FeedJob;
@@ -39,7 +54,7 @@ function cursorOf(job: FeedJob | undefined): FeedCursor | null {
   return job ? { ts: job.postedAt, id: job.id } : null;
 }
 
-export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget }: DiscoverViewProps) {
+export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget, master: initialMaster }: DiscoverViewProps) {
   const router = useRouter();
   const pathname = usePathname();
   const toast = useToast();
@@ -58,9 +73,45 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
   const cursor = useRef<FeedCursor | null>(cursorOf(initialJobs.at(-1)));
   const seen = useRef(new Set(initialJobs.map((job) => job.id)));
 
+  // Match scores against the master resume, computed in the browser and cached per job.
+  const [master, setMaster] = useState(initialMaster);
+  const [minMatch, setMinMatch] = useState<number>(0);
+  // A fresh cache whenever the resume changes.
+  const scores = useMemo(() => new Map<string, number | null>(), [master]);
+  useEffect(() => {
+    if (mode === "demo") setMaster(loadDemoResume());
+    try {
+      const stored = Number(window.localStorage.getItem(MATCH_KEY));
+      if ((MATCH_STEPS as readonly number[]).includes(stored)) setMinMatch(stored);
+    } catch {
+      // Storage blocked: keep showing every job.
+    }
+  }, [mode]);
+  const matchOf = useCallback(
+    (job: FeedJob): number | null => {
+      if (!master) return null;
+      if (!scores.has(job.id)) {
+        scores.set(job.id, scoreResume(master, analyzeJob(job.title, job.description)).score);
+      }
+      return scores.get(job.id) ?? null;
+    },
+    [master, scores],
+  );
+  const chooseMinMatch = (value: number) => {
+    setMinMatch(value);
+    try {
+      window.localStorage.setItem(MATCH_KEY, String(value));
+    } catch {
+      // Not remembered; still applies for this visit.
+    }
+  };
+  // Posts that name too few skills to score always stay visible.
+  const visible = minMatch && master ? queue.filter((job) => (matchOf(job) ?? 100) >= minMatch) : queue;
+  const hiddenByMatch = queue.length - visible.length;
+
   // Keep the deck topped up as it runs low.
   useEffect(() => {
-    if (exhausted || loadingMore || queue.length > REFILL_AT) return;
+    if (exhausted || loadingMore || visible.length > REFILL_AT) return;
     setLoadingMore(true);
     loadMoreJobs(filters, cursor.current)
       .then((result) => {
@@ -76,7 +127,7 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
         if (result.data.length < PAGE_SIZE) setExhausted(true);
       })
       .finally(() => setLoadingMore(false));
-  }, [exhausted, loadingMore, queue.length, filters, toast]);
+  }, [exhausted, loadingMore, visible.length, filters, toast]);
 
   const changeFilters = useCallback(
     (next: FeedFilters) => {
@@ -155,7 +206,7 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
       const target = event.target as HTMLElement | null;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (target?.closest("input, textarea, select, dialog, [contenteditable]")) return;
-      const top = queue[0];
+      const top = visible[0];
       const key = event.key;
       if ((key === "z" || key === "Z" || key === "Backspace") && history.current.length) {
         event.preventDefault();
@@ -174,9 +225,9 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [queue, view, decide, undo]);
+  }, [visible, view, decide, undo]);
 
-  const top = queue[0];
+  const top = visible[0];
   const capLeft = Math.max(budget.cap - budget.used, 0);
 
   return (
@@ -198,6 +249,20 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
             <p className="text-xs text-muted max-sm:hidden">{capLeft === 0 ? "Cap reached: right swipes save" : `${capLeft} left in your daily cap`}</p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+        <label className="sr-only" htmlFor="min-match">Minimum match</label>
+        <select
+          id="min-match"
+          value={minMatch}
+          disabled={!master}
+          title={master ? "Hide jobs your resume matches less than this" : "Save your resume to see match scores"}
+          onChange={(event) => chooseMinMatch(Number(event.target.value))}
+          className="h-9 rounded-lg border bg-surface px-2 text-sm font-medium text-text hover:bg-surface-2 disabled:opacity-50"
+        >
+          {MATCH_STEPS.map((step) => (
+            <option key={step} value={step}>{step ? `Match ${step}%+` : "Any match"}</option>
+          ))}
+        </select>
         <div className="flex rounded-lg border bg-surface p-0.5" role="group" aria-label="View">
           {(
             [
@@ -220,11 +285,20 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
             </button>
           ))}
         </div>
+        </div>
       </div>
 
       <FilterBar key={feedFiltersToQuery(filters)} filters={filters} onChange={changeFilters} pending={pending} />
+      {hiddenByMatch > 0 ? (
+        <p className="-mt-2 text-xs text-muted">
+          {hiddenByMatch} loaded job{hiddenByMatch > 1 ? "s" : ""} hidden below {minMatch}% match.{" "}
+          <button type="button" onClick={() => chooseMinMatch(0)} className="font-medium text-accent hover:underline">
+            Show all
+          </button>
+        </p>
+      ) : null}
 
-      {queue.length === 0 && !loadingMore ? (
+      {visible.length === 0 && !loadingMore ? (
         <Card>
           <EmptyState
             icon={SearchX}
@@ -246,17 +320,18 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
         <div className="mx-auto flex w-full max-w-md flex-col items-center gap-5">
           <div className="relative h-[calc(100dvh-27rem)] min-h-[21rem] md:h-[min(32rem,calc(100dvh-25rem))] w-full">
             <AnimatePresence custom={exitDirection} initial={false}>
-              {queue.slice(0, 3).map((job, depth) => (
+              {visible.slice(0, 3).map((job, depth) => (
                 <SwipeCard
                   key={job.id}
                   job={job}
+                  match={matchOf(job)}
                   depth={depth}
                   onSwipe={(direction) => void decide(job, direction)}
                   onDetails={() => setDetails(job)}
                 />
               ))}
             </AnimatePresence>
-            {queue.length === 0 ? (
+            {visible.length === 0 ? (
               <div className="absolute inset-0 grid place-items-center rounded-3xl border border-dashed text-sm text-muted">
                 Loading more jobs…
               </div>
@@ -285,7 +360,7 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
         <LayoutGroup>
           <ul className="flex flex-col gap-2">
             <AnimatePresence initial={false}>
-              {queue.map((job) => (
+              {visible.map((job) => (
                 <motion.li
                   key={job.id}
                   layout
@@ -297,7 +372,10 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
                   <button type="button" onClick={() => setDetails(job)} className="flex min-w-0 flex-1 items-start gap-3 text-left">
                     <CompanyAvatar company={job.company} className="size-10" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">{job.title}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate font-medium">{job.title}</span>
+                        <MatchBadge score={matchOf(job)} />
+                      </span>
                       <span className="block truncate text-sm text-muted" suppressHydrationWarning>
                         {job.company} · {locationLine(job.location, job.countryCodes)} · {timeAgo(job.postedAt)}
                       </span>

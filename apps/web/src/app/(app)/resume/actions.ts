@@ -36,8 +36,25 @@ export async function saveMasterResume(content: unknown): Promise<ActionResult<{
   return { ok: true, data: { updatedAt: data[0].updated_at } };
 }
 
-/** Asks the configured free AI provider for rewordings. Nothing is saved here. */
-export async function rewriteWithAi(applicationId: unknown): Promise<ActionResult<RewriteProposal>> {
+export type AiSuggestions = RewriteProposal & {
+  model: string;
+  /** Reused from an earlier call for the same job and resume; no quota spent. */
+  cached: boolean;
+};
+
+const cachedResultSchema = z.object({
+  summary: z.string().max(1500).nullable(),
+  rewrites: z.record(z.string().max(60), z.string().max(600)),
+  model: z.string().max(100),
+});
+
+const CACHE_DAYS = 30;
+
+/**
+ * Asks the configured free AI provider for rewordings. Suggestions for the
+ * same job and the same version of the master are reused unless `fresh`.
+ */
+export async function rewriteWithAi(applicationId: unknown, fresh: unknown = false): Promise<ActionResult<AiSuggestions>> {
   const id = applicationIdSchema.safeParse(applicationId);
   if (!id.success) return { ok: false, error: "Invalid request." };
 
@@ -51,19 +68,43 @@ export async function rewriteWithAi(applicationId: unknown): Promise<ActionResul
   if (!context) return { ok: false, error: "That application no longer exists." };
 
   const supabase = await createClient();
-  const { data: allowed, error } = await supabase.rpc("claim_llm_call", { p_kind: "tailor" });
+  if (fresh !== true) {
+    const since = new Date(Date.now() - CACHE_DAYS * 86_400_000).toISOString();
+    const { data: hit } = await supabase
+      .from("llm_calls")
+      .select("result")
+      .eq("application_id", id.data)
+      .eq("base_updated_at", master.updatedAt)
+      .not("result", "is", null)
+      .gte("created_at", since)
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const cached = cachedResultSchema.safeParse(hit?.result);
+    if (cached.success) return { ok: true, data: { ...cached.data, cached: true } };
+  }
+
+  const { data: callId, error } = await supabase.rpc("claim_llm_call", { p_kind: "tailor" });
   if (error) {
     console.error(`[orbit] claim_llm_call: ${error.code} ${error.message}`);
     return { ok: false, error: sessionError(error.code, "Couldn't start the rewrite.") };
   }
-  if (!allowed) return { ok: false, error: "You've used today's AI rewrites. The built-in tailoring still works." };
+  if (callId === null) return { ok: false, error: "You've used today's AI rewrites. The built-in tailoring still works." };
 
   try {
     const analysis = analyzeJob(context.job.title, context.job.description);
     const reply = await chatJson(config, buildRewriteMessages(master.resume, context.job, analysis));
-    const proposal = parseRewriteResponse(reply, master.resume);
+    const proposal = parseRewriteResponse(reply.content, master.resume);
     if (!proposal) return { ok: false, error: `${config.label} replied in a format Orbit couldn't read. Try again.` };
-    return { ok: true, data: proposal };
+    const result = { ...proposal, model: reply.model };
+    const saved = await supabase.rpc("save_llm_result", {
+      p_call_id: callId,
+      p_application_id: id.data,
+      p_base_updated_at: master.updatedAt,
+      p_result: result,
+    });
+    if (saved.error) console.error(`[orbit] save_llm_result: ${saved.error.code} ${saved.error.message}`);
+    return { ok: true, data: { ...result, cached: false } };
   } catch (error) {
     if (error instanceof LlmError) {
       console.error(`[orbit] llm: ${error.message}`);
@@ -99,16 +140,14 @@ export async function saveTailoredVersion(applicationId: unknown, inputs: unknow
     summary: kept.find((c) => c.id === "summary")?.after ?? null,
     hidden: choice.data.hidden,
   };
-  const diff = result.changes
-    .filter((c) => c.status !== "unchanged" || c.hidden)
-    .map((c) => ({ id: c.id, status: c.status, hidden: c.hidden, before: c.before, after: c.after }));
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("save_resume_variant", {
     p_application_id: id.data,
     p_content: result.resume,
     p_inputs: storedInputs,
-    p_diff: diff,
+    // The diff is recomputed from the master when shown, so it isn't stored.
+    p_diff: [],
     p_match_score: result.after.score,
     p_missing_keywords: result.after.missing.map((k) => k.label),
     p_source: kept.length ? choice.data.source : "rules",

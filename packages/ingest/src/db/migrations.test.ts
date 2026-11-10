@@ -407,23 +407,58 @@ describe("database migrations", () => {
 
     it("caps AI calls per user per day and blocks direct writes", async () => {
       const claims = await asUser(db, ALICE, async () => {
-        const results: boolean[] = [];
-        for (let i = 0; i < 31; i++) {
-          results.push((await db.query<{ ok: boolean }>("select public.claim_llm_call('tailor') as ok")).rows[0]!.ok);
+        const results: (string | null)[] = [];
+        for (let i = 0; i < 201; i++) {
+          results.push((await db.query<{ id: string | null }>("select public.claim_llm_call('tailor') as id")).rows[0]!.id);
         }
         return results;
       });
-      expect(claims.filter(Boolean)).toHaveLength(30);
-      expect(claims[30]).toBe(false);
-      expect((await asUser(db, BOB, () => db.query<{ ok: boolean }>("select public.claim_llm_call('tailor') as ok"))).rows[0]!.ok).toBe(true);
+      expect(claims.filter((id) => id !== null)).toHaveLength(200);
+      expect(claims[200]).toBeNull();
+      expect((await asUser(db, BOB, () => db.query<{ id: string | null }>("select public.claim_llm_call('tailor') as id"))).rows[0]!.id).not.toBeNull();
 
-      const usage = await asUser(db, ALICE, () => db.query<{ used: number }>("select used from public.my_llm_usage()"));
-      expect(usage.rows[0]!.used).toBe(30);
+      const usage = await asUser(db, ALICE, () => db.query<{ used: number; daily_limit: number }>("select * from public.my_llm_usage()"));
+      expect(usage.rows[0]).toEqual({ used: 200, daily_limit: 200 });
       await expect(
         asUser(db, ALICE, () => db.query("insert into public.llm_calls (user_id, kind) values ($1, 'tailor')", [ALICE])),
       ).rejects.toThrow();
-      await expect(asUser(db, ALICE, () => db.query("delete from public.llm_calls"))).resolves.toBeTruthy();
-      expect((await db.query("select id from public.llm_calls")).rows).toHaveLength(31);
+      await asUser(db, ALICE, () => db.query("delete from public.llm_calls"));
+      expect((await db.query("select id from public.llm_calls")).rows).toHaveLength(201);
+    });
+
+    it("keeps an AI result as a cache on the caller's own call only", async () => {
+      const application = await queuedApplication(ALICE);
+      const id = (await asUser(db, ALICE, () => db.query<{ id: string }>("select public.claim_llm_call('tailor') as id"))).rows[0]!.id;
+      const save = (user: string, result: string) =>
+        asUser(db, user, () =>
+          db.query("select public.save_llm_result($1, $2, '2026-11-10T00:00:00Z', $3::jsonb)", [id, application, result]),
+        );
+      await expect(save(BOB, '{"x":2}')).rejects.toThrow(/application not found/);
+      await save(ALICE, '{"x":1}');
+      await save(ALICE, '{"x":3}');
+      const cached = await asUser(db, ALICE, () =>
+        db.query<{ result: unknown }>("select result from public.llm_calls where application_id = $1", [application]),
+      );
+      expect(cached.rows).toEqual([{ result: { x: 1 } }]);
+    });
+
+    it("keeps one draft per job but never deletes a copy that was sent", async () => {
+      const application = await queuedApplication(ALICE);
+      await asUser(db, ALICE, async () => {
+        await saveVariant(application);
+        await saveVariant(application);
+      });
+      expect((await db.query("select id from public.resume_variants")).rows).toHaveLength(1);
+
+      await db.query("update public.applications set status = 'applied'");
+      const sent = await db.query<{ id: string }>("select id from public.resume_variants where sent_at is not null");
+      expect(sent.rows).toHaveLength(1);
+
+      await asUser(db, ALICE, () => saveVariant(application));
+      await asUser(db, ALICE, () => saveVariant(application));
+      const rows = await db.query<{ id: string; sent: boolean }>("select id, sent_at is not null as sent from public.resume_variants order by created_at");
+      expect(rows.rows.map((r) => r.sent)).toEqual([true, false]);
+      expect(rows.rows[0]!.id).toBe(sent.rows[0]!.id);
     });
   });
 });

@@ -20,7 +20,7 @@ new entry point is added.
 ## Limits against abuse
 
 - Database caps: text lengths, salary ranges and URL schemes are constrained in SQL.
-- AI rewording: 30 calls per user and 300 for the whole app per 24 hours, reserved by `claim_llm_call` (security definer, limits fixed in SQL, serialized per user). Users can read but not write or delete their usage rows. Submission limits arrive with the autopilot.
+- AI rewording: 200 calls per user and 400 for the whole app per 24 hours, reserved by `claim_llm_call` (security definer, limits fixed in SQL, serialized per user). Users can read but not write or delete their usage rows; `save_llm_result` can only fill in the caller's own reserved call once, for their own application. Submission limits arrive with the autopilot.
 - Resumes and tailored versions are capped at 256 KB each in SQL; a tailored version can only be attached to the same user's application (trigger).
 - Hosting: Vercel and Supabase both provide network-level DDoS protection on free plans.
 

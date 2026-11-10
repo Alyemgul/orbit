@@ -22,6 +22,9 @@ resume for each one, submits the application, and keeps your pipeline up to date
   Every reworded line is fact-checked against your master: a rewrite that adds a number,
   a skill or a name you didn't write is blocked and the original line is kept. Each change
   shows as a word-level diff. Saved versions attach to the application.
+- **Match filter**: once your resume is saved, every Discover card shows a match score,
+  and you can hide jobs below 30, 50 or 70%.
+- **Settings**: your daily apply limit (up to 200) and today's AI usage are on Profile.
 
 Still to come: the autopilot browser extension, the inbox.
 
@@ -72,7 +75,17 @@ lines to `apps/web/.env.local` (server-only; never prefix these with `NEXT_PUBLI
 `LLM_MODEL` overrides the default model if a provider renames or retires it. Only your
 bullets, summary and the job post are sent: never your name, email, phone or links.
 Google's free tier may use prompts to improve its products; Groq and Ollama don't train on
-them. Each person gets 30 AI rewrites a day and the whole app 300, enforced in the database.
+them. Orbit allows 200 AI rewrites a day (400 for the whole app), enforced in the database;
+in practice the provider's free quota is the limit. When the main model is rate-limited,
+Orbit retries once on a lighter free model (`LLM_FALLBACK_MODEL` to change it). Asking again
+for the same job reuses the earlier answer, so it costs no quota.
+
+## Storage
+
+Tailored resumes are stored as small JSON rows, never as files: the PDF is made on demand.
+Each job keeps one working version (saving replaces it); the version you actually applied
+with is kept permanently. Drafts for jobs rejected or archived more than 60 days ago are
+removed when you next save.
 
 ## Checks
 

@@ -75,9 +75,9 @@ export function TailorView({ mode, applicationId, job, master: initialMaster, la
     );
   }
 
-  async function runAi() {
+  async function runAi(fresh = false) {
     setBusy("ai");
-    const response = await rewriteWithAi(applicationId);
+    const response = await rewriteWithAi(applicationId, fresh);
     setBusy(null);
     if (!response.ok) return toast({ message: response.error, tone: "danger" });
     const count = Object.keys(response.data.rewrites).length + (response.data.summary ? 1 : 0);
@@ -86,8 +86,15 @@ export function TailorView({ mode, applicationId, job, master: initialMaster, la
     setDeclined(new Set());
     setSource("ai");
     setDirty(true);
-    setUsed((n) => n + 1);
-    toast({ message: count ? `${aiLabel} suggested ${count} rewordings. Each one was fact-checked.` : `${aiLabel} had no changes to suggest.`, tone: "success" });
+    if (!response.data.cached) setUsed((n) => n + 1);
+    const what = count ? `${count} rewordings, each fact-checked` : "no changes";
+    toast({
+      message: response.data.cached
+        ? `Loaded earlier suggestions (${what}). No quota used.`
+        : `${aiLabel} (${response.data.model}) suggested ${what}.`,
+      tone: "success",
+      ...(response.data.cached ? { action: { label: "Ask again", onClick: () => void runAi(true) } } : {}),
+    });
   }
 
   async function save() {
@@ -177,7 +184,7 @@ export function TailorView({ mode, applicationId, job, master: initialMaster, la
             </button>
           ))}
         </div>
-        <Button variant="secondary" size="sm" onClick={runAi} disabled={!aiLabel || busy !== null || mode === "demo" || aiLeft === 0}
+        <Button variant="secondary" size="sm" onClick={() => void runAi()} disabled={!aiLabel || busy !== null || mode === "demo" || aiLeft === 0}
           title={!aiLabel ? "Set LLM_PROVIDER and LLM_API_KEY to turn on AI rewording (free providers)" : undefined}>
           <Sparkles /> {busy === "ai" ? "Rewording…" : aiLabel ? `Reword with ${aiLabel}` : "AI rewording off"}
         </Button>

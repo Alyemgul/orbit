@@ -147,6 +147,8 @@ export type ResumeVariantRow = {
   source: "rules" | "ai";
   /** The master's updated_at when this version was made. */
   base_updated_at: string | null;
+  /** Set when the application was submitted with this version; such copies are kept. */
+  sent_at: string | null;
   created_at: string;
 };
 
@@ -154,6 +156,10 @@ export type LlmCallRow = {
   id: number;
   user_id: string;
   kind: "tailor" | "import";
+  application_id: string | null;
+  base_updated_at: string | null;
+  /** The suggestions this call produced, reused instead of calling again. */
+  result: Json | null;
   created_at: string;
 };
 
@@ -248,7 +254,11 @@ export type Database = {
         };
         Returns: string;
       };
-      claim_llm_call: { Args: { p_kind: LlmCallRow["kind"] }; Returns: boolean };
+      claim_llm_call: { Args: { p_kind: LlmCallRow["kind"] }; Returns: number | null };
+      save_llm_result: {
+        Args: { p_call_id: number; p_application_id: string; p_base_updated_at: string; p_result: Json };
+        Returns: undefined;
+      };
       my_llm_usage: { Args: Record<PropertyKey, never>; Returns: { used: number; daily_limit: number }[] };
     };
     Enums: {

@@ -3,6 +3,7 @@
 import { ExternalLink, Info } from "lucide-react";
 import { motion, useMotionValue, useReducedMotion, useTransform, type PanInfo } from "motion/react";
 import { CompanyAvatar, JobTags } from "@/components/job/job-bits";
+import { MatchBadge } from "./match-badge";
 import type { FeedJob } from "@/lib/jobs/feed-job";
 import { locationLine, timeAgo } from "@/lib/jobs/format";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,8 @@ const VELOCITY = 650;
 
 interface SwipeCardProps {
   job: FeedJob;
+  /** Match against the master resume, when there is one. */
+  match?: number | null;
   /** 0 = top card; deeper cards sit smaller and lower. */
   depth: number;
   onSwipe: (direction: SwipeDirection) => void;
@@ -29,7 +32,7 @@ const exitVariant = (direction: SwipeDirection | null) => ({
   transition: { duration: 0.32, ease: [0.32, 0.72, 0, 1] as const },
 });
 
-export function SwipeCard({ job, depth, onSwipe, onDetails }: SwipeCardProps) {
+export function SwipeCard({ job, match = null, depth, onSwipe, onDetails }: SwipeCardProps) {
   const reduceMotion = useReducedMotion();
   const isTop = depth === 0;
   const x = useMotionValue(0);
@@ -95,6 +98,7 @@ export function SwipeCard({ job, depth, onSwipe, onDetails }: SwipeCardProps) {
             {job.postedAtKnown ? `Posted ${timeAgo(job.postedAt)}` : `Found ${timeAgo(job.postedAt)}`}
           </p>
         </div>
+        <MatchBadge score={match} />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-5">

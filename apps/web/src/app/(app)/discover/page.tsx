@@ -7,6 +7,7 @@ import { fetchApplyBudget, fetchFeed, fetchSourceHealth, type SourceHealth } fro
 import { demoFeed } from "@/lib/demo";
 import { isSupabaseConfigured } from "@/lib/env";
 import { timeAgo } from "@/lib/jobs/format";
+import { fetchMasterResume } from "@/lib/resume.server";
 import { getCurrentUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Discover" };
@@ -18,10 +19,15 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
   const live = isSupabaseConfigured();
   const user = live ? await getCurrentUser() : null;
 
-  const [jobs, budget, health] =
+  const [jobs, budget, health, master] =
     live && user
-      ? await Promise.all([fetchFeed(filters, null), fetchApplyBudget(user.id), fetchSourceHealth()])
-      : [demoFeed(filters), { used: 0, cap: 15 }, null];
+      ? await Promise.all([
+          fetchFeed(filters, null),
+          fetchApplyBudget(user.id),
+          fetchSourceHealth(),
+          fetchMasterResume().catch(() => null),
+        ])
+      : [demoFeed(filters), { used: 0, cap: 15 }, null, null];
 
   return (
     <>
@@ -39,6 +45,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
         filters={filters}
         mode={live ? "live" : "demo"}
         budget={budget}
+        master={master?.resume ?? null}
       />
     </>
   );
