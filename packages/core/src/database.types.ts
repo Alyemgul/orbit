@@ -128,6 +128,8 @@ export type ApplicationRow = {
   notes: string | null;
   last_error: string | null;
   updated_by: EventActor;
+  /** What the autopilot needs from the user (status needs_input). */
+  needs: Json | null;
   created_at: string;
   updated_at: string;
 };
@@ -151,6 +153,26 @@ export type ResumeVariantRow = {
   sent_at: string | null;
   created_at: string;
 };
+
+export type ConnectionTokenRow = {
+  id: string;
+  user_id: string;
+  kind: "extension" | "gmail";
+  token_hash: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+};
+
+/** A question the autopilot couldn't answer, as stored in applications.needs. */
+export type PendingQuestion = {
+  text: string;
+  type: "text" | "textarea" | "select" | "radio" | "checkbox" | "file" | "other";
+  options?: string[];
+  required: boolean;
+};
+
+export type ApplicationNeeds = { reason: string; questions: PendingQuestion[]; at: string };
 
 export type LlmCallRow = {
   id: number;
@@ -230,6 +252,7 @@ export type Database = {
       application_transitions: Table<ApplicationTransitionRow, "from_status" | "to_status">;
       application_events: Table<ApplicationEventRow, never>;
       llm_calls: Table<LlmCallRow, "user_id" | "kind">;
+      connection_tokens: Table<ConnectionTokenRow, "user_id" | "kind" | "token_hash">;
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -259,6 +282,8 @@ export type Database = {
         Args: { p_call_id: number; p_application_id: string; p_base_updated_at: string; p_result: Json };
         Returns: undefined;
       };
+      create_connection_token: { Args: { p_kind: ConnectionTokenRow["kind"] }; Returns: string };
+      revoke_connection_token: { Args: { p_kind: ConnectionTokenRow["kind"] }; Returns: undefined };
       my_llm_usage: { Args: Record<PropertyKey, never>; Returns: { used: number; daily_limit: number }[] };
     };
     Enums: {

@@ -20,6 +20,7 @@ import { useToast } from "@/components/ui/toast";
 import { loadDemoResume } from "@/lib/demo-resume";
 import { timeAgo } from "@/lib/jobs/format";
 import type { SavedVersion, TailorJob } from "@/lib/resume.server";
+import { downloadResumePdf } from "@/lib/download-pdf";
 import { cn } from "@/lib/utils";
 import { PrintableResume, ResumeDocument } from "./resume-document";
 
@@ -189,7 +190,7 @@ export function TailorView({ mode, applicationId, job, master: initialMaster, la
           <Sparkles /> {busy === "ai" ? "Rewording…" : aiLabel ? `Reword with ${aiLabel}` : "AI rewording off"}
         </Button>
         {aiLeft !== null && aiLabel ? <span className="text-xs text-muted">{aiLeft} left today</span> : null}
-        <Button variant="ghost" size="sm" onClick={() => window.print()} title="Opens the print dialog; choose Save as PDF">
+        <Button variant="ghost" size="sm" onClick={() => void downloadResumePdf(result.resume)} title="Download the exact PDF the autopilot uploads">
           <Download /> PDF
         </Button>
         <Button size="sm" className="ml-auto" onClick={save} disabled={busy !== null || (!dirty && Boolean(saved))}>

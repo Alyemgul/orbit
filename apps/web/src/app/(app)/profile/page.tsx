@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ApplyCapForm } from "@/components/profile/apply-cap-form";
+import { AutopilotCard, GmailCard } from "@/components/profile/autopilot-cards";
 import { ProgressRing } from "@/components/stats/rings";
 import { getLlmConfig } from "@/lib/llm.server";
+import { fetchConnections } from "@/lib/inbox.server";
 import { fetchLlmUsage } from "@/lib/resume.server";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 
@@ -14,15 +16,19 @@ export const metadata: Metadata = { title: "Profile" };
 export default async function ProfilePage() {
   const user = await getCurrentUser();
   const llm = getLlmConfig();
-  const [profile, usage] = user
+  const [profile, usage, connections] = user
     ? await Promise.all([
         createClient().then((supabase) =>
-          supabase.from("profiles").select("daily_apply_cap").eq("user_id", user.id).maybeSingle(),
+          supabase.from("profiles").select("daily_apply_cap, review_before_send, preferences").eq("user_id", user.id).maybeSingle(),
         ),
         fetchLlmUsage(),
+        fetchConnections(),
       ])
-    : [null, null];
+    : [null, null, []];
   const cap = profile?.data?.daily_apply_cap ?? 15;
+  const preferences = profile?.data?.preferences;
+  const acceptPrivacy =
+    typeof preferences === "object" && preferences !== null && !Array.isArray(preferences) && preferences.autopilot_accept_privacy === true;
 
   return (
     <>
@@ -90,6 +96,16 @@ export default async function ProfilePage() {
             <ThemeSwitcher showLabels />
           </CardContent>
         </Card>
+
+        <AutopilotCard
+          connection={connections.find((c) => c.kind === "extension") ?? null}
+          review={profile?.data?.review_before_send ?? false}
+          acceptPrivacy={acceptPrivacy}
+          disabled={!user}
+        />
+        <GmailCard connection={connections.find((c) => c.kind === "gmail") ?? null} disabled={!user} />
+
+
       </div>
     </>
   );

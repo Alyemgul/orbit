@@ -58,12 +58,14 @@ export const APPLICATION_TRANSITIONS: Readonly<Record<ApplicationStatus, readonl
   // "applied" is allowed directly for jobs the user applied to outside Orbit.
   saved: ["queued", "applied", "archived"],
   // "applied" covers applying by hand before the autopilot gets to it.
-  queued: ["tailoring", "failed", "applied", "archived"],
+  // "submitting" lets the autopilot send the master resume when no tailored copy was made.
+  queued: ["tailoring", "submitting", "failed", "applied", "archived"],
   tailoring: ["ready", "failed", "archived"],
   // "ready" is where review-before-send mode parks an application.
   ready: ["submitting", "applied", "archived"],
   submitting: ["applied", "needs_input", "failed"],
-  needs_input: ["submitting", "applied", "archived"],
+  // "ready" puts it back in the autopilot's queue once the user has answered.
+  needs_input: ["ready", "submitting", "applied", "archived"],
   failed: ["queued", "applied", "archived"],
   applied: ["interviewing", "offer", "rejected", "archived"],
   interviewing: ["offer", "rejected", "archived"],

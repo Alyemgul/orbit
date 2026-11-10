@@ -26,13 +26,25 @@ resume for each one, submits the application, and keeps your pipeline up to date
   and you can hide jobs below 30, 50 or 70%.
 - **Settings**: your daily apply limit (up to 200) and today's AI usage are on Profile.
 
-Still to come: the autopilot browser extension, the inbox.
+- **Autopilot** (Chrome extension): opens queued Greenhouse, Lever and Ashby applications,
+  fills them from your tailored resume (uploaded as a real PDF) and saved answers, and
+  submits them, one at a time, 3 minutes apart, up to your daily limit. Review mode fills
+  and waits for you to press Submit. "Fill this page" fills any supported form you open.
+- **Inbox**: questions the autopilot couldn't answer, CAPTCHAs and failed submissions.
+  Answer once; the answer memory reuses it on every form. Visa, work-authorization and
+  diversity questions are only ever filled from your own saved answers.
+- **Gmail reply tracking**: a small script in your own Google account moves applications to
+  Interviewing, Offer or Rejected when companies reply. Only sender and subject reach Orbit.
+
+Still to come: polish (animations, accessibility pass, offline, data export and delete).
 
 ## Layout
 
 ```
 apps/web          Next.js 15 app (web + installable PWA)
-packages/core     Shared domain logic: application state machine, schemas
+apps/extension    Chrome extension: the autopilot (Manifest V3)
+packages/core     Shared domain logic: state machine, resume engine, form matching, PDF
+packages/ingest   Job ingestion CLI (runs on GitHub Actions)
 supabase/         Database migrations (Postgres + Row Level Security)
 ```
 
@@ -79,6 +91,26 @@ them. Orbit allows 200 AI rewrites a day (400 for the whole app), enforced in th
 in practice the provider's free quota is the limit. When the main model is rate-limited,
 Orbit retries once on a lighter free model (`LLM_FALLBACK_MODEL` to change it). Asking again
 for the same job reuses the earlier answer, so it costs no quota.
+
+## Autopilot extension (free)
+
+The Chrome Web Store charges a fee, so the extension is loaded unpacked instead:
+
+1. Run `npm run build -w @orbit/extension`.
+2. Open `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and pick
+   `apps/extension/dist`.
+3. In Orbit, open Profile → Autopilot extension → **Connect extension**, copy the code,
+   paste it into the extension's popup, and switch it on.
+
+Chrome has to be open for it to run. It checks every minute, never solves CAPTCHAs, and
+sends anything it can't finish to the Inbox. Rebuild and press reload on
+`chrome://extensions` after pulling updates.
+
+## Gmail reply tracking (free)
+
+Profile → Gmail reply tracking → **Set up**. Paste the generated script into a new project
+at script.google.com, run `setup` once and allow access. It runs every 30 minutes in your own
+account, classifies job emails there, and sends Orbit only sender, subject and reply type.
 
 ## Storage
 

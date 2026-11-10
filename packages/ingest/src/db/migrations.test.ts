@@ -73,7 +73,7 @@ describe("database migrations", () => {
 
   beforeEach(async () => {
     await db.exec(
-      "delete from public.resume_variants; delete from public.resumes; delete from public.llm_calls; delete from public.applications; delete from public.swipes; delete from public.jobs;",
+      "delete from public.connection_tokens; delete from public.screening_answers; delete from public.resume_variants; delete from public.resumes; delete from public.llm_calls; delete from public.applications; delete from public.swipes; delete from public.jobs;",
     );
   });
 
@@ -459,6 +459,150 @@ describe("database migrations", () => {
       const rows = await db.query<{ id: string; sent: boolean }>("select id, sent_at is not null as sent from public.resume_variants order by created_at");
       expect(rows.rows.map((r) => r.sent)).toEqual([true, false]);
       expect(rows.rows[0]!.id).toBe(sent.rows[0]!.id);
+    });
+  });
+
+  describe("autopilot", () => {
+    async function token(userId: string, kind = "extension"): Promise<string> {
+      const result = await asUser(db, userId, () => db.query<{ t: string }>("select public.create_connection_token($1) as t", [kind]));
+      return result.rows[0]!.t;
+    }
+
+    async function asAnon<T>(fn: () => Promise<T>): Promise<T> {
+      await db.exec("set role anon");
+      try {
+        return await fn();
+      } finally {
+        await db.exec("reset role");
+      }
+    }
+
+    async function ext<T = Record<string, unknown>>(fn: string, args: unknown[]): Promise<T> {
+      const placeholders = args.map((_, i) => `$${i + 1}`).join(", ");
+      const result = await asAnon(() => db.query<{ r: T }>(`select public.${fn}(${placeholders}) as r`, args));
+      return result.rows[0]!.r;
+    }
+
+    async function queued(userId: string, overrides: Record<string, unknown> = {}): Promise<string> {
+      await upsert(db, [jobPayload(overrides)]);
+      const job = (await db.query<{ id: string }>("select id from public.jobs order by first_seen_at desc limit 1")).rows[0]!.id;
+      return asUser(db, userId, async () => {
+        await db.query("select public.record_swipe($1, 'apply')", [job]);
+        return (await db.query<{ id: string }>("select id from public.applications where job_id = $1", [job])).rows[0]!.id;
+      });
+    }
+
+    it("issues revocable connection tokens that only reach the autopilot functions", async () => {
+      const first = await token(ALICE);
+      expect(first).toMatch(/^[0-9a-f]{64}$/);
+      expect((await db.query("select token_hash from public.connection_tokens where token_hash = $1", [first])).rows).toHaveLength(0);
+      const status = await ext<{ email: string; cap: number }>("ext_status", [first]);
+      expect(status).toMatchObject({ email: "alice@example.com", cap: 15 });
+
+      const second = await token(ALICE);
+      await expect(ext("ext_status", [first])).rejects.toThrow(/invalid connection/);
+      await expect(ext("ext_status", ["x".repeat(64)])).rejects.toThrow(/invalid connection/);
+      await expect(ext("gmail_ingest", [second, "[]"])).rejects.toThrow(/invalid connection/);
+      await expect(asAnon(() => db.query("select public.connection_user($1, 'extension')", [second]))).rejects.toThrow(/permission denied/);
+      await expect(asAnon(() => db.query("select public.create_connection_token('extension')"))).rejects.toThrow(/permission denied/);
+
+      await asUser(db, ALICE, () => db.query("select public.revoke_connection_token('extension')"));
+      await expect(ext("ext_status", [second])).rejects.toThrow(/invalid connection/);
+    });
+
+    it("hands out one application at a time, paced and capped", async () => {
+      const t = await token(ALICE);
+      expect(await ext("ext_next_application", [t])).toMatchObject({ status: "empty" });
+
+      const first = await queued(ALICE, { dedupe_hash: "a1", source_job_id: "a1" });
+      const second = await queued(ALICE, { dedupe_hash: "a2", source_job_id: "a2" });
+      await queued(ALICE, { dedupe_hash: "w1", source_job_id: "w1", ats_type: "workday" });
+      expect(await ext("ext_next_application", [t])).toMatchObject({ status: "no_resume" });
+      expect((await db.query<{ status: string }>("select status::text from public.applications where id = $1", [first])).rows[0]!.status).toBe("failed");
+
+      await asUser(db, ALICE, () => db.query(`select * from public.save_master_resume('{"basics":{"name":"Alice"}}')`));
+      await db.query("update public.application_events set created_at = now() - interval '1 hour' where to_status = 'submitting'");
+      const next = await ext<{ status: string; application: { id: string; ats_type: string }; resume: { basics: { name: string } } }>(
+        "ext_next_application",
+        [t],
+      );
+      expect(next.status).toBe("ok");
+      expect(next.application).toMatchObject({ id: second, ats_type: "greenhouse" });
+      expect(next.resume.basics.name).toBe("Alice");
+      expect(await ext("ext_next_application", [t])).toMatchObject({ status: "busy" });
+
+      await ext("ext_report", [t, second, "applied", JSON.stringify({ answers: [] })]);
+      expect(await ext("ext_next_application", [t])).toMatchObject({ status: "wait" });
+
+      await db.query("update public.profiles set daily_apply_cap = 1 where user_id = $1", [ALICE]);
+      await db.query("update public.application_events set created_at = now() - interval '1 hour' where actor = 'extension' and to_status = 'submitting'");
+      expect(await ext("ext_next_application", [t])).toMatchObject({ status: "cap" });
+      await db.query("update public.profiles set daily_apply_cap = 15 where user_id = $1", [ALICE]);
+
+      // Bob's token never sees Alice's applications.
+      const bobToken = await token(BOB);
+      expect(await ext("ext_next_application", [bobToken])).toMatchObject({ status: "empty" });
+      await expect(ext("ext_report", [bobToken, second, "applied", "{}"])).rejects.toThrow(/not being submitted/);
+    });
+
+    it("parks questions for the user and learns answers from submissions", async () => {
+      const t = await token(ALICE);
+      await asUser(db, ALICE, () => db.query(`select * from public.save_master_resume('{"basics":{"name":"Alice"}}')`));
+      const app = await queued(ALICE);
+      expect(await ext("ext_next_application", [t])).toMatchObject({ status: "ok" });
+
+      const questions = [{ text: "Will you require sponsorship?", type: "select", options: ["Yes", "No"], required: true }];
+      await ext("ext_report", [t, app, "needs_input", JSON.stringify({ reason: "1 question needs you", questions })]);
+      const parked = await db.query<{ status: string; needs: { questions: unknown[]; reason: string } }>(
+        "select status::text, needs from public.applications where id = $1",
+        [app],
+      );
+      expect(parked.rows[0]!.status).toBe("needs_input");
+      expect(parked.rows[0]!.needs).toMatchObject({ reason: "1 question needs you", questions });
+
+      const hash = "a".repeat(64);
+      await ext("ext_report", [
+        t,
+        app,
+        "applied",
+        JSON.stringify({ answers: [{ hash, question: "Will you require sponsorship?", answer: "Yes", sensitive: true }, { hash: "bad", question: "x", answer: "y" }] }),
+      ]);
+      const saved = await db.query("select question_text, answer, is_sensitive from public.screening_answers where user_id = $1", [ALICE]);
+      expect(saved.rows).toEqual([{ question_text: "Will you require sponsorship?", answer: "Yes", is_sensitive: true }]);
+      const answers = await ext<{ question: string }[]>("ext_answers", [t]);
+      expect(answers.map((a) => a.question)).toEqual(["Will you require sponsorship?"]);
+      expect((await db.query<{ needs: unknown }>("select needs from public.applications where id = $1", [app])).rows[0]!.needs).toBeNull();
+    });
+
+    it("serves the master resume for Fill this page and learns answers", async () => {
+      const t = await token(ALICE);
+      await asUser(db, ALICE, () => db.query(`select * from public.save_master_resume('{"basics":{"name":"Alice"}}')`));
+      await db.query("update public.profiles set preferences = '{\"autopilot_accept_privacy\": true}' where user_id = $1", [ALICE]);
+      expect(await ext("ext_profile", [t])).toMatchObject({ resume: { basics: { name: "Alice" } }, accept_privacy: true });
+      const answers = JSON.stringify([{ hash: "b".repeat(64), question: "How did you hear about us?", answer: "A friend" }]);
+      expect(await ext<number>("ext_learn", [t, answers])).toBe(1);
+      expect(await ext<number>("ext_learn", [t, answers])).toBe(1);
+      expect((await db.query("select answer from public.screening_answers where user_id = $1", [ALICE])).rows).toEqual([{ answer: "A friend" }]);
+      await db.query("update public.profiles set preferences = '{}' where user_id = $1", [ALICE]);
+    });
+
+    it("moves applications from Gmail replies, matched by company, once per email", async () => {
+      const t = await token(ALICE, "gmail");
+      const app = await queued(ALICE, { company: "Lumen Payments" });
+      await db.query("update public.applications set status = 'applied' where id = $1", [app]);
+
+      const events = (kind: string, id: string, from = "Lumen Payments <no-reply@greenhouse.io>") =>
+        JSON.stringify([{ message_id: id, kind, from, subject: "Your application" }]);
+      expect(await ext<number>("gmail_ingest", [t, events("interview", "m1")])).toBe(1);
+      expect(await ext<number>("gmail_ingest", [t, events("interview", "m1")])).toBe(0);
+      expect(await ext<number>("gmail_ingest", [t, events("rejection", "m2", "Other Corp <jobs@other.example>")])).toBe(0);
+      const status = async () => (await db.query<{ status: string }>("select status::text from public.applications where id = $1", [app])).rows[0]!.status;
+      expect(await status()).toBe("interviewing");
+
+      expect(await ext<number>("gmail_ingest", [t, events("rejection", "m3")])).toBe(1);
+      expect(await status()).toBe("rejected");
+      const logged = await db.query<{ payload: { kind: string } }>("select payload from public.application_events where type = 'email' order by id");
+      expect(logged.rows.map((r) => r.payload.kind)).toEqual(["interview", "rejection"]);
     });
   });
 });

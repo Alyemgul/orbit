@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import { loadDemoResume, saveDemoResume } from "@/lib/demo-resume";
 import { timeAgo } from "@/lib/jobs/format";
 import type { VersionListItem } from "@/lib/resume.server";
+import { downloadResumePdf } from "@/lib/download-pdf";
 import { cn } from "@/lib/utils";
 import { PrintableResume, ResumeDocument } from "./resume-document";
 import { ResumeEditor } from "./resume-editor";
@@ -109,7 +110,7 @@ export function ResumeWorkspace({ mode, initial, updatedAt, versions }: ResumeWo
           <Button variant="ghost" size="sm" onClick={() => importRef.current?.showModal()}>
             <FileUp /> Import
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => window.print()} title="Opens the print dialog; choose Save as PDF">
+          <Button variant="ghost" size="sm" onClick={() => void downloadResumePdf(resume)} title="Download the exact PDF the autopilot uploads">
             <Download /> PDF
           </Button>
           <span className="ml-auto text-xs text-muted" aria-live="polite" suppressHydrationWarning>

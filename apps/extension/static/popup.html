@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Orbit Autopilot</title>
+    <style>
+      :root {
+        --bg: #0c0c11;
+        --surface: #14141b;
+        --surface-2: #1b1b24;
+        --border: #2a2a36;
+        --text: #ececf2;
+        --muted: #9a9aac;
+        --accent: #8c7eff;
+        --accent-soft: #231e4a;
+        --success: #4ade80;
+        --warning: #facc15;
+        --danger: #f87171;
+        color-scheme: dark;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f6f6f9;
+          --surface: #ffffff;
+          --surface-2: #f0f0f5;
+          --border: #e3e3ea;
+          --text: #15151c;
+          --muted: #5f5f6e;
+          --accent: #5847d6;
+          --accent-soft: #ecebfc;
+          --success: #15803d;
+          --warning: #a16207;
+          --danger: #b91c1c;
+          color-scheme: light;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        width: 340px;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+      header strong { font-size: 14px; }
+      header .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); margin-left: auto; }
+      header .dot.on { background: var(--success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 25%, transparent); }
+      main { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+      .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+      .row { display: flex; align-items: center; gap: 8px; }
+      .muted { color: var(--muted); }
+      .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+      .stats b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+      .stats span { font-size: 11px; color: var(--muted); }
+      button {
+        font: inherit; font-weight: 600; border-radius: 8px; border: 1px solid var(--border);
+        background: var(--surface-2); color: var(--text); padding: 7px 10px; cursor: pointer;
+      }
+      button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+      button:disabled { opacity: 0.5; cursor: default; }
+      textarea {
+        width: 100%; min-height: 70px; resize: vertical; border-radius: 8px; border: 1px solid var(--border);
+        background: var(--surface-2); color: var(--text); font: 11px/1.4 ui-monospace, monospace; padding: 8px;
+      }
+      .switch { margin-left: auto; position: relative; width: 38px; height: 22px; }
+      .switch input { opacity: 0; width: 0; height: 0; }
+      .switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--border); transition: background 0.15s; cursor: pointer; }
+      .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+      .switch input:checked + span { background: var(--accent); }
+      .switch input:checked + span::after { transform: translateX(16px); }
+      .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+      ul.log { list-style: none; margin: 0; padding: 0; max-height: 170px; overflow: auto; }
+      ul.log li { padding: 5px 0; border-top: 1px solid var(--border); font-size: 12px; }
+      ul.log li:first-child { border-top: 0; }
+      ul.log time { color: var(--muted); font-size: 11px; margin-right: 6px; font-variant-numeric: tabular-nums; }
+      .success { color: var(--success); } .warning { color: var(--warning); } .danger { color: var(--danger); }
+      [hidden] { display: none !important; }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>Orbit Autopilot</strong>
+      <span id="dot" class="dot" aria-hidden="true"></span>
+    </header>
+    <main>
+      <section id="connect" class="card" hidden>
+        <p style="margin: 0 0 8px">Paste the connection code from Orbit → Profile → Autopilot extension.</p>
+        <textarea id="code" aria-label="Connection code" placeholder="orbit1.…"></textarea>
+        <p id="connect-error" class="danger" role="alert" hidden></p>
+        <button id="connect-btn" class="primary" style="margin-top: 8px; width: 100%">Connect</button>
+      </section>
+
+      <section id="connected" hidden>
+        <div class="card row">
+          <div>
+            <div><b>Autopilot</b></div>
+            <div id="account" class="muted"></div>
+          </div>
+          <label class="switch" title="Turn the autopilot on or off">
+            <input id="toggle" type="checkbox" aria-label="Autopilot on" />
+            <span></span>
+          </label>
+        </div>
+        <div class="card stats" style="margin-top: 10px">
+          <div><b id="applied">0</b><span id="cap">of 15 today</span></div>
+          <div><b id="waiting">0</b><span>in queue</span></div>
+          <div><b id="needs">0</b><span>need you</span></div>
+        </div>
+        <p id="run" class="card" style="margin: 10px 0 0" hidden></p>
+        <p id="status-error" class="danger" role="alert" hidden></p>
+        <div class="row" style="margin-top: 10px">
+          <button id="fill-btn" title="Fill the application open in this tab with your master resume">Fill this page</button>
+          <button id="run-btn">Check now</button>
+          <button id="disconnect-btn" style="margin-left: auto">Disconnect</button>
+        </div>
+        <p id="fill-result" class="muted" hidden></p>
+        <div class="card" style="margin-top: 10px">
+          <div class="muted" style="font-size: 11px; margin-bottom: 4px">Activity</div>
+          <ul id="log" class="log"></ul>
+        </div>
+        <p class="muted" style="font-size: 11px; margin: 8px 0 0">
+          Works on Greenhouse, Lever and Ashby. Keep Chrome open while it runs. It never solves CAPTCHAs or guesses visa and
+          diversity answers: those land in Orbit's Inbox.
+        </p>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

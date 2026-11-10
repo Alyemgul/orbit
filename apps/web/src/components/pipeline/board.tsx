@@ -385,6 +385,11 @@ function CardBody({ item, onMove, handleProps, lifted }: CardBodyProps) {
         </span>
       </div>
       {item.last_error && item.status === "failed" ? <p className="mt-2 text-xs text-danger">{item.last_error}</p> : null}
+      {item.status === "needs_input" || item.status === "failed" ? (
+        <Link href="/inbox" className="mt-2 inline-flex text-xs font-medium text-accent hover:underline">
+          {item.status === "failed" ? "Retry from Inbox" : "Answer in Inbox"}
+        </Link>
+      ) : null}
       {onMove ? (
         <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t pt-2.5">
           <a

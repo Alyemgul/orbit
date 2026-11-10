@@ -27,7 +27,8 @@ MIT License text, as required for the projects above:
 Built on open-source libraries including [Next.js](https://nextjs.org),
 [Supabase](https://supabase.com), [Motion](https://motion.dev) (MIT) for animation,
 [dnd-kit](https://dndkit.com) (MIT) for drag and drop, [Tailwind CSS](https://tailwindcss.com),
-[Lucide](https://lucide.dev) icons and [Zod](https://zod.dev).
+[Lucide](https://lucide.dev) icons, [Zod](https://zod.dev), [pdf-lib](https://pdf-lib.js.org) (MIT)
+for resume PDFs, and [esbuild](https://esbuild.github.io) (MIT) to build the extension.
 
 ## Ideas only (no code copied)
 
