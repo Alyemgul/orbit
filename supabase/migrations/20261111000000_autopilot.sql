@@ -9,7 +9,7 @@
 -- Connection tokens
 ------------------------------------------------------------------------------
 
-create table public.connection_tokens (
+create table if not exists public.connection_tokens (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references auth.users (id) on delete cascade,
   kind         text not null check (kind in ('extension', 'gmail')),
@@ -19,10 +19,11 @@ create table public.connection_tokens (
   revoked_at   timestamptz
 );
 
-create index connection_tokens_user_idx on public.connection_tokens (user_id, kind) where revoked_at is null;
+create index if not exists connection_tokens_user_idx on public.connection_tokens (user_id, kind) where revoked_at is null;
 
 alter table public.connection_tokens enable row level security;
 
+drop policy if exists "connection_tokens: read own" on public.connection_tokens;
 create policy "connection_tokens: read own"
   on public.connection_tokens for select
   to authenticated
@@ -107,8 +108,9 @@ $$;
 -- Applications: what the autopilot needs from the user, and new transitions.
 ------------------------------------------------------------------------------
 
+alter table public.applications add column if not exists needs jsonb;
+alter table public.applications drop constraint if exists applications_needs_size;
 alter table public.applications
-  add column needs jsonb,
   add constraint applications_needs_size check (needs is null or pg_column_size(needs) <= 32768);
 
 insert into public.application_transitions (from_status, to_status) values

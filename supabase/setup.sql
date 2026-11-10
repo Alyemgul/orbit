@@ -1,10 +1,10 @@
 -- Orbit database setup for a NEW, empty Supabase project: paste into SQL Editor and Run.
--- Existing projects: run only the migration files you haven't run yet.
--- Generated from supabase/migrations.
-
-begin;
+-- Existing projects: run upgrade.sql instead.
+-- Generated from supabase/migrations by supabase/build-sql.mjs.
 
 -- ===== migrations/20261105000000_profiles.sql =====
+begin;
+
 -- Orbit 0001: user profiles.
 -- One row per auth user, created automatically on sign-up.
 -- Row Level Security restricts every user to their own row.
@@ -76,7 +76,11 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+commit;
+
 -- ===== migrations/20261105000100_jobs_pipeline.sql =====
+begin;
+
 -- Orbit 0002: jobs, ingestion log, swipes, applications, resumes.
 --
 -- Jobs are shared (read-only to users, written by the ingest job with the
@@ -588,8 +592,6 @@ revoke execute on function public.applications_log_event() from public, anon, au
 
 commit;
 
--- Enum additions must run outside the transaction above.
-
 -- ===== migrations/20261106000000_job_categories_quant_business.sql =====
 -- Orbit 0003: categories for CS-skilled roles outside pure software.
 --   quant         : quant developer/researcher, trading engineer, trader
@@ -862,13 +864,20 @@ begin;
 -- Size limits (the app validates shape; the database caps size).
 ------------------------------------------------------------------------------
 
+-- Safe to run more than once: every step checks what already exists.
+alter table public.resumes drop constraint if exists resumes_content_size;
 alter table public.resumes
   add constraint resumes_content_size check (pg_column_size(content) <= 262144);
 
 alter table public.resume_variants
-  add column inputs     jsonb not null default '{}'::jsonb,
-  add column source     text not null default 'rules' check (source in ('rules', 'ai')),
-  add column base_updated_at timestamptz,
+  add column if not exists inputs     jsonb not null default '{}'::jsonb,
+  add column if not exists source     text not null default 'rules' check (source in ('rules', 'ai')),
+  add column if not exists base_updated_at timestamptz;
+alter table public.resume_variants
+  drop constraint if exists resume_variants_content_size,
+  drop constraint if exists resume_variants_diff_size,
+  drop constraint if exists resume_variants_inputs_size;
+alter table public.resume_variants
   add constraint resume_variants_content_size check (pg_column_size(content) <= 262144),
   add constraint resume_variants_diff_size check (pg_column_size(diff) <= 262144),
   add constraint resume_variants_inputs_size check (pg_column_size(inputs) <= 131072);
@@ -890,6 +899,7 @@ begin
 end;
 $$;
 
+drop trigger if exists resume_variants_check_owner on public.resume_variants;
 create trigger resume_variants_check_owner
   before insert or update on public.resume_variants
   for each row execute function public.resume_variants_check_owner();
@@ -986,19 +996,20 @@ $$;
 -- AI call budget
 ------------------------------------------------------------------------------
 
-create table public.llm_calls (
+create table if not exists public.llm_calls (
   id         bigint generated always as identity primary key,
   user_id    uuid not null references auth.users (id) on delete cascade,
   kind       text not null check (kind in ('tailor', 'import')),
   created_at timestamptz not null default now()
 );
 
-create index llm_calls_user_time_idx on public.llm_calls (user_id, created_at desc);
-create index llm_calls_time_idx on public.llm_calls (created_at desc);
+create index if not exists llm_calls_user_time_idx on public.llm_calls (user_id, created_at desc);
+create index if not exists llm_calls_time_idx on public.llm_calls (created_at desc);
 
 alter table public.llm_calls enable row level security;
 
 -- Users can see their own usage; rows are only ever written by claim_llm_call.
+drop policy if exists "llm_calls: read own" on public.llm_calls;
 create policy "llm_calls: read own"
   on public.llm_calls for select
   to authenticated
@@ -1009,7 +1020,9 @@ revoke insert, update, delete, truncate on public.llm_calls from anon, authentic
 -- Reserves one AI call, or returns false when the user (30 a day) or the
 -- whole app (300 a day) is out of budget. Limits live here, not in the
 -- caller, so a direct call can only spend the caller's own allowance.
-create or replace function public.claim_llm_call(p_kind text)
+-- Dropped first: 0006 changes its return type, so a re-run must start clean.
+drop function if exists public.claim_llm_call(text);
+create function public.claim_llm_call(p_kind text)
 returns boolean
 language plpgsql
 security definer
@@ -1075,19 +1088,21 @@ begin;
 ------------------------------------------------------------------------------
 
 alter table public.llm_calls
-  add column application_id  uuid references public.applications (id) on delete cascade,
+  add column if not exists application_id  uuid references public.applications (id) on delete cascade,
   -- The master resume's updated_at the suggestions were made from.
-  add column base_updated_at timestamptz,
-  add column result          jsonb,
+  add column if not exists base_updated_at timestamptz,
+  add column if not exists result          jsonb;
+alter table public.llm_calls drop constraint if exists llm_calls_result_size;
+alter table public.llm_calls
   add constraint llm_calls_result_size check (result is null or pg_column_size(result) <= 65536);
 
-create index llm_calls_cache_idx on public.llm_calls (user_id, application_id, base_updated_at, id desc)
+create index if not exists llm_calls_cache_idx on public.llm_calls (user_id, application_id, base_updated_at, id desc)
   where result is not null;
 
 -- Returns the reserved call's id, or null when out of budget. Limits are
 -- fixed here (200 per user, 400 for the app per 24 hours); the real ceiling
 -- is usually the AI provider's own free quota.
-drop function public.claim_llm_call(text);
+drop function if exists public.claim_llm_call(text);
 create function public.claim_llm_call(p_kind text)
 returns bigint
 language plpgsql
@@ -1162,7 +1177,7 @@ $$;
 -- whatever was actually sent.
 ------------------------------------------------------------------------------
 
-alter table public.resume_variants add column sent_at timestamptz;
+alter table public.resume_variants add column if not exists sent_at timestamptz;
 
 -- When an application is submitted, the version attached to it is frozen.
 create or replace function public.applications_stamp_sent_variant()
@@ -1181,6 +1196,7 @@ begin
 end;
 $$;
 
+drop trigger if exists applications_stamp_sent_variant on public.applications;
 create trigger applications_stamp_sent_variant
   after insert or update of status on public.applications
   for each row execute function public.applications_stamp_sent_variant();
@@ -1275,7 +1291,7 @@ begin;
 -- Connection tokens
 ------------------------------------------------------------------------------
 
-create table public.connection_tokens (
+create table if not exists public.connection_tokens (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references auth.users (id) on delete cascade,
   kind         text not null check (kind in ('extension', 'gmail')),
@@ -1285,10 +1301,11 @@ create table public.connection_tokens (
   revoked_at   timestamptz
 );
 
-create index connection_tokens_user_idx on public.connection_tokens (user_id, kind) where revoked_at is null;
+create index if not exists connection_tokens_user_idx on public.connection_tokens (user_id, kind) where revoked_at is null;
 
 alter table public.connection_tokens enable row level security;
 
+drop policy if exists "connection_tokens: read own" on public.connection_tokens;
 create policy "connection_tokens: read own"
   on public.connection_tokens for select
   to authenticated
@@ -1373,8 +1390,9 @@ $$;
 -- Applications: what the autopilot needs from the user, and new transitions.
 ------------------------------------------------------------------------------
 
+alter table public.applications add column if not exists needs jsonb;
+alter table public.applications drop constraint if exists applications_needs_size;
 alter table public.applications
-  add column needs jsonb,
   add constraint applications_needs_size check (needs is null or pg_column_size(needs) <= 32768);
 
 insert into public.application_transitions (from_status, to_status) values

@@ -143,6 +143,39 @@ describe("runIngest", () => {
     expect(acme).toMatchObject({ status: "success", fetched: 2, upserted: 1, invalid: 1 });
   });
 
+  it("keeps the rest of a batch when the database rejects one job", async () => {
+    // Simulates a database that hasn't run the migration adding the "quant" category.
+    class OldSchemaSink extends PgliteSink {
+      override async upsertJobs(rows: JobUpsert[]): Promise<number> {
+        if (rows.some((r) => r.category === "quant")) throw new Error('invalid input value for enum job_category: "quant"');
+        if (rows.some((r) => r.title === "Broken")) throw new Error("value too long");
+        return super.upsertJobs(rows);
+      }
+    }
+    const summary = await runIngest({
+      sources: [
+        source("greenhouse:acme", 10, async () => [
+          job("1", "Backend Engineer"),
+          job("2", "Quantitative Developer"),
+          job("3", "Broken"),
+        ]),
+      ],
+      sink: new OldSchemaSink(db),
+      http: unusedHttp,
+      log: quiet,
+      concurrency: 1,
+      sourceTimeoutMs: 200,
+      retentionDays: 30,
+    });
+    expect(summary.healthy).toBe(true);
+    const rows = await db.query<{ title: string; category: string }>("select title, category::text from public.jobs order by title");
+    expect(rows.rows).toEqual([
+      { title: "Backend Engineer", category: "software_engineering" },
+      { title: "Quantitative Developer", category: "other" },
+    ]);
+    expect(summary.runs[0]).toMatchObject({ status: "success", upserted: 2 });
+  });
+
   it("reports unhealthy when every source fails", async () => {
     const summary = await run([
       source("a", 10, async () => {

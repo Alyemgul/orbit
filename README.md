@@ -69,8 +69,9 @@ jobs; sign-in and saving are off.
 ## Connect Supabase (free tier)
 
 1. Create a project at supabase.com.
-2. In the SQL editor, run `supabase/setup.sql` (a new project), or each file in
-   `supabase/migrations/` you haven't run yet, in order.
+2. In the SQL editor, run `supabase/setup.sql` for a new project. For an existing project,
+   run `supabase/upgrade.sql`: it is safe to run again and brings any older database up to
+   date. (Both are generated from `supabase/migrations/` by `node supabase/build-sql.mjs`.)
 3. Authentication → URL Configuration: set Site URL to `http://localhost:3000` (and your
    deployed URL later), and add `http://localhost:3000/auth/callback` to Redirect URLs.
 4. Copy `apps/web/.env.example` to `apps/web/.env.local` and fill in the project URL and

@@ -6,13 +6,20 @@
 -- Size limits (the app validates shape; the database caps size).
 ------------------------------------------------------------------------------
 
+-- Safe to run more than once: every step checks what already exists.
+alter table public.resumes drop constraint if exists resumes_content_size;
 alter table public.resumes
   add constraint resumes_content_size check (pg_column_size(content) <= 262144);
 
 alter table public.resume_variants
-  add column inputs     jsonb not null default '{}'::jsonb,
-  add column source     text not null default 'rules' check (source in ('rules', 'ai')),
-  add column base_updated_at timestamptz,
+  add column if not exists inputs     jsonb not null default '{}'::jsonb,
+  add column if not exists source     text not null default 'rules' check (source in ('rules', 'ai')),
+  add column if not exists base_updated_at timestamptz;
+alter table public.resume_variants
+  drop constraint if exists resume_variants_content_size,
+  drop constraint if exists resume_variants_diff_size,
+  drop constraint if exists resume_variants_inputs_size;
+alter table public.resume_variants
   add constraint resume_variants_content_size check (pg_column_size(content) <= 262144),
   add constraint resume_variants_diff_size check (pg_column_size(diff) <= 262144),
   add constraint resume_variants_inputs_size check (pg_column_size(inputs) <= 131072);
@@ -34,6 +41,7 @@ begin
 end;
 $$;
 
+drop trigger if exists resume_variants_check_owner on public.resume_variants;
 create trigger resume_variants_check_owner
   before insert or update on public.resume_variants
   for each row execute function public.resume_variants_check_owner();
@@ -130,19 +138,20 @@ $$;
 -- AI call budget
 ------------------------------------------------------------------------------
 
-create table public.llm_calls (
+create table if not exists public.llm_calls (
   id         bigint generated always as identity primary key,
   user_id    uuid not null references auth.users (id) on delete cascade,
   kind       text not null check (kind in ('tailor', 'import')),
   created_at timestamptz not null default now()
 );
 
-create index llm_calls_user_time_idx on public.llm_calls (user_id, created_at desc);
-create index llm_calls_time_idx on public.llm_calls (created_at desc);
+create index if not exists llm_calls_user_time_idx on public.llm_calls (user_id, created_at desc);
+create index if not exists llm_calls_time_idx on public.llm_calls (created_at desc);
 
 alter table public.llm_calls enable row level security;
 
 -- Users can see their own usage; rows are only ever written by claim_llm_call.
+drop policy if exists "llm_calls: read own" on public.llm_calls;
 create policy "llm_calls: read own"
   on public.llm_calls for select
   to authenticated
@@ -153,7 +162,9 @@ revoke insert, update, delete, truncate on public.llm_calls from anon, authentic
 -- Reserves one AI call, or returns false when the user (30 a day) or the
 -- whole app (300 a day) is out of budget. Limits live here, not in the
 -- caller, so a direct call can only spend the caller's own allowance.
-create or replace function public.claim_llm_call(p_kind text)
+-- Dropped first: 0006 changes its return type, so a re-run must start clean.
+drop function if exists public.claim_llm_call(text);
+create function public.claim_llm_call(p_kind text)
 returns boolean
 language plpgsql
 security definer

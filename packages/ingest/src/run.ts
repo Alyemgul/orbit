@@ -103,6 +103,28 @@ async function fetchSource(source: Source, options: RunOptions): Promise<FetchOu
   }
 }
 
+const UNKNOWN_ENUM = /invalid input value for enum (public\.)?job_category/i;
+
+/**
+ * Writes a single job. If the database doesn't know a newer category yet
+ * (its migration hasn't been run), the job is stored as "other" instead of
+ * being lost.
+ */
+async function writeRow(sink: IngestSink, row: JobUpsert): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  try {
+    return { ok: true, count: await sink.upsertJobs([row]) };
+  } catch (error) {
+    if (UNKNOWN_ENUM.test(errorMessage(error)) && row.category !== "other") {
+      try {
+        return { ok: true, count: await sink.upsertJobs([{ ...row, category: "other" }]) };
+      } catch (retryError) {
+        return { ok: false, error: errorMessage(retryError) };
+      }
+    }
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
 /**
  * One ingest run:
  * 1. fetch every source in parallel, each isolated with its own time budget;
@@ -141,14 +163,34 @@ export async function runIngest(options: RunOptions): Promise<IngestSummary> {
   for (const outcome of outcomes) {
     const rows = rowsBySource.get(outcome.source.id) ?? [];
     let count = 0;
-    try {
-      for (let i = 0; i < rows.length; i += batchSize) {
-        count += await sink.upsertJobs(rows.slice(i, i + batchSize));
+    let rejected = 0;
+    let firstError: string | null = null;
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
+      try {
+        count += await sink.upsertJobs(batch);
+      } catch (batchError) {
+        // One bad row must not sink the whole batch: retry the rows one by one.
+        for (const row of batch) {
+          const written = await writeRow(sink, row);
+          if (written.ok) count += written.count;
+          else {
+            rejected++;
+            firstError ??= written.error;
+          }
+        }
+        firstError ??= errorMessage(batchError);
       }
-    } catch (error) {
-      healthy = false;
-      writeFailed.set(outcome.source.id, `database write failed: ${errorMessage(error)}`);
-      log.error(`${outcome.source.id}: ${writeFailed.get(outcome.source.id)}`);
+    }
+    if (rejected > 0) {
+      const message = `${rejected} of ${rows.length} jobs rejected by the database: ${firstError}`;
+      if (count === 0) {
+        healthy = false;
+        writeFailed.set(outcome.source.id, `database write failed: ${message}`);
+        log.error(`${outcome.source.id}: ${message}`);
+      } else {
+        log.warn(`${outcome.source.id}: ${message}`);
+      }
     }
     upserted.set(outcome.source.id, count);
   }

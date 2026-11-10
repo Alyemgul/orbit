@@ -6,7 +6,7 @@ import { PGlite } from "@electric-sql/pglite";
 export const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "../../../../supabase/migrations");
 
 /** Minimal stand-ins for what Supabase provides before our migrations run. */
-const SUPABASE_STUBS = `
+export const SUPABASE_STUBS = `
   create role anon nologin;
   create role authenticated nologin;
   create role service_role nologin bypassrls;

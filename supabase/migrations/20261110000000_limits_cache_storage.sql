@@ -6,19 +6,21 @@
 ------------------------------------------------------------------------------
 
 alter table public.llm_calls
-  add column application_id  uuid references public.applications (id) on delete cascade,
+  add column if not exists application_id  uuid references public.applications (id) on delete cascade,
   -- The master resume's updated_at the suggestions were made from.
-  add column base_updated_at timestamptz,
-  add column result          jsonb,
+  add column if not exists base_updated_at timestamptz,
+  add column if not exists result          jsonb;
+alter table public.llm_calls drop constraint if exists llm_calls_result_size;
+alter table public.llm_calls
   add constraint llm_calls_result_size check (result is null or pg_column_size(result) <= 65536);
 
-create index llm_calls_cache_idx on public.llm_calls (user_id, application_id, base_updated_at, id desc)
+create index if not exists llm_calls_cache_idx on public.llm_calls (user_id, application_id, base_updated_at, id desc)
   where result is not null;
 
 -- Returns the reserved call's id, or null when out of budget. Limits are
 -- fixed here (200 per user, 400 for the app per 24 hours); the real ceiling
 -- is usually the AI provider's own free quota.
-drop function public.claim_llm_call(text);
+drop function if exists public.claim_llm_call(text);
 create function public.claim_llm_call(p_kind text)
 returns bigint
 language plpgsql
@@ -93,7 +95,7 @@ $$;
 -- whatever was actually sent.
 ------------------------------------------------------------------------------
 
-alter table public.resume_variants add column sent_at timestamptz;
+alter table public.resume_variants add column if not exists sent_at timestamptz;
 
 -- When an application is submitted, the version attached to it is frozen.
 create or replace function public.applications_stamp_sent_variant()
@@ -112,6 +114,7 @@ begin
 end;
 $$;
 
+drop trigger if exists applications_stamp_sent_variant on public.applications;
 create trigger applications_stamp_sent_variant
   after insert or update of status on public.applications
   for each row execute function public.applications_stamp_sent_variant();
