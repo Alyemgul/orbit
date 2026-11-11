@@ -10,7 +10,7 @@ import { LoginForm } from "./login-form";
 export const metadata: Metadata = { title: "Sign in" };
 
 const ERROR_MESSAGES: Record<string, string> = {
-  link: "That sign-in link is invalid or has expired. Request a new one.",
+  link: "That link only works in the browser where you asked for it. Type the code from the email instead, or request a new one here.",
 };
 
 export default async function LoginPage({
@@ -60,7 +60,7 @@ export default async function LoginPage({
           </CardContent>
         </Card>
 
-        <p className="mt-6 text-center text-xs text-muted">No passwords. We email you a one-time link.</p>
+        <p className="mt-6 text-center text-xs text-muted">No passwords. We email you a one-time code.</p>
       </div>
     </main>
   );
