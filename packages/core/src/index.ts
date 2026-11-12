@@ -18,3 +18,4 @@ export * from "./resume/prompt";
 export * from "./autopilot/questions";
 export * from "./autopilot/fields";
 export * from "./autopilot/connection";
+export * from "./gmail-classifier";

@@ -97,9 +97,15 @@ describe("factCheck", () => {
     expect(factCheck("Built a Python service that cut report generation time by 40%", "Developed a Python service that reduced report generation time by 40%", context)).toEqual([]);
   });
 
-  it("warns about unknown names without blocking", () => {
+  it("blocks names that aren't in the resume: teams, companies, places", () => {
     const issues = factCheck("Organised the team's weekly demo meetings", "Organised weekly demos for the SRE team", context);
-    expect(issues).toEqual([expect.objectContaining({ kind: "new_name", severity: "warning" })]);
+    expect(issues).toEqual([expect.objectContaining({ kind: "new_name", severity: "error" })]);
+    const company = factCheck("Moved two cron jobs into Docker containers", "Moved two cron jobs into Docker containers at Google in Berlin", context);
+    expect(company.map((i) => i.detail)).toEqual([expect.stringContaining("Google"), expect.stringContaining("Berlin")]);
+  });
+
+  it("allows a capitalised word at the start of a sentence", () => {
+    expect(factCheck("Built a Python service", "Developed a Python service. Shipped it weekly", context)).toEqual([]);
   });
 });
 

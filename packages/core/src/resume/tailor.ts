@@ -54,6 +54,8 @@ export interface TailorResult {
 const NUMBER = /\d+(?:[.,]\d+)*\s*(?:%|x\b|k\b|m\b|bn\b|\+)?/gi;
 /** Acronyms and mixed-case names (AWS, GraphQL, iOS) that should exist somewhere in the master. */
 const NAME = /\b(?:[A-Z]{2,}[a-z]*|[a-z]+[A-Z][A-Za-z]*|[A-Z][a-z]+[A-Z][A-Za-z]*)\b/g;
+/** Capitalised words mid-sentence (Google, Berlin, Siemens): proper names, not sentence starts. */
+const PROPER_NOUN = /(?<!(?:^|[.!?:;•–—-])\s*)\b\p{Lu}\p{Ll}+\b/gu;
 
 function numbers(text: string): Set<string> {
   return new Set((text.match(NUMBER) ?? []).map((n) => n.replace(/[\s,]/g, "").toLowerCase()));
@@ -92,12 +94,14 @@ export function factCheck(before: string, after: string, context: FactContext): 
   }
 
   const masterLower = context.masterText.toLowerCase();
-  const seen = new Set<string>();
-  for (const name of after.match(NAME) ?? []) {
+  // Skills already reported above aren't reported again as names.
+  const seen = new Set(issues.filter((i) => i.kind === "new_skill").map((i) => i.detail.match(/“(.+?)”/)?.[1]?.toLowerCase() ?? ""));
+  for (const name of [...(after.match(NAME) ?? []), ...(after.match(PROPER_NOUN) ?? [])]) {
     const lower = name.toLowerCase();
-    if (seen.has(lower) || masterLower.includes(lower)) continue;
+    if (seen.has(lower) || masterLower.includes(lower) || before.toLowerCase().includes(lower)) continue;
     seen.add(lower);
-    issues.push({ kind: "new_name", severity: "warning", detail: `Mentions “${name}”; check it's true.` });
+    // A company, place or product that isn't anywhere in the resume is a new claim.
+    issues.push({ kind: "new_name", severity: "error", detail: `Mentions “${name}”, which isn't in your resume.` });
   }
 
   if (before && after.length > before.length * 1.6 + 20) {

@@ -4,6 +4,8 @@
  * classifies them on Google's side, and sends Orbit just the sender,
  * subject and the kind of reply. Email bodies never leave Gmail.
  */
+import { GMAIL_CLASSIFY_SOURCE, GMAIL_QUERY } from "@orbit/core";
+
 export function gmailScript(values: { url: string; anonKey: string; token: string }): string {
   return `// Orbit: Gmail reply tracking. Runs in your own Google account.
 // Only the sender, subject and reply type of job emails are sent to Orbit.
@@ -13,18 +15,9 @@ const ORBIT_URL = ${JSON.stringify(values.url)};
 const ORBIT_KEY = ${JSON.stringify(values.anonKey)}; // public key
 const ORBIT_TOKEN = ${JSON.stringify(values.token)}; // revocable
 
-const QUERY =
-  'newer_than:3d -in:sent -in:chats (subject:(application OR applying OR applied OR interview OR "next steps" OR offer OR unfortunately OR candidacy OR "your candidature") ' +
-  'OR from:(greenhouse.io OR greenhouse-mail.io OR lever.co OR hire.lever.co OR ashbyhq.com OR myworkday.com OR smartrecruiters.com OR workablemail.com OR teamtailor-mail.com OR personio.de))';
+const QUERY = ${JSON.stringify(GMAIL_QUERY)};
 
-function classify(subject, body) {
-  const text = (subject + " " + body).toLowerCase();
-  if (/(pleased|happy|delighted|excited) to (extend|offer)|offer letter|job offer|offer of employment/.test(text)) return "offer";
-  if (/unfortunately|not (to )?(be )?mov(e|ing) forward|other candidates|regret to inform|decided not to|no longer (being )?consider|not been selected|position has (now )?been filled|will not be (progressing|proceeding)/.test(text)) return "rejection";
-  if (/interview|next step|schedule (a|your) (call|chat|time)|your availability|coding (challenge|test|assessment)|online assessment|hackerrank|codility|take[- ]home|phone screen/.test(text)) return "interview";
-  if (/application (was |has been )?(received|submitted)|thank(s| you) for (applying|your application|your interest)|we have received your application/.test(text)) return "received";
-  return null;
-}
+${GMAIL_CLASSIFY_SOURCE}
 
 function orbitSync() {
   const props = PropertiesService.getScriptProperties();
