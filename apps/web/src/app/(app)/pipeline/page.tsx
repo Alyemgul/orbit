@@ -2,10 +2,14 @@ import { Flame, Trophy } from "lucide-react";
 import type { Metadata } from "next";
 import { PipelineBoard } from "@/components/pipeline/board";
 import { ActivityHeatmap, summarizeActivity } from "@/components/stats/activity-heatmap";
+import { MatchSummaryCard } from "@/components/stats/match-summary-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { fetchActivity, fetchPipeline, todayInTimeZone } from "@/lib/data.server";
-import { DEMO_PIPELINE, demoActivity } from "@/lib/demo";
+import { DEMO_JOBS, DEMO_PIPELINE, demoActivity } from "@/lib/demo";
+import { DEMO_RESUME } from "@/lib/demo-resume";
 import { isSupabaseConfigured } from "@/lib/env";
+import { fetchMatchSummary, summarizeMatches, type MatchSummary } from "@/lib/match-summary.server";
+import { fetchMasterResume } from "@/lib/resume.server";
 import { getCurrentUser } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Pipeline" };
@@ -20,6 +24,20 @@ export default async function PipelinePage() {
       : [DEMO_PIPELINE, demoActivity(365), new Date().toISOString().slice(0, 10)];
   const summary = summarizeActivity(activity, today);
 
+  let matches: MatchSummary | null = null;
+  let matchesFailed = false;
+  if (live && user) {
+    try {
+      const master = await fetchMasterResume();
+      matches = master ? await fetchMatchSummary(user.id, master) : null;
+    } catch (error) {
+      console.error("Match summary failed:", error);
+      matchesFailed = true;
+    }
+  } else if (!live) {
+    matches = summarizeMatches(DEMO_RESUME, DEMO_JOBS, DEMO_JOBS.length);
+  }
+
   return (
     <>
       <PageHeader
@@ -32,6 +50,8 @@ export default async function PipelinePage() {
       />
 
       <PipelineBoard initialItems={items} mode={live ? "live" : "demo"} userId={user?.id ?? null} />
+
+      <MatchSummaryCard summary={matches} failed={matchesFailed} />
 
       <section className="mt-6 rounded-2xl border bg-surface p-5 shadow-card" aria-labelledby="activity-title">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">

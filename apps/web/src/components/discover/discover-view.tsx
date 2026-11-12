@@ -11,6 +11,7 @@ import {
 } from "@orbit/core";
 import { Check, Layers, List, RotateCcw, SearchX, Star, X } from "lucide-react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { loadMoreJobs, swipeJob, undoSwipe } from "@/app/(app)/discover/actions";
@@ -42,7 +43,7 @@ interface DiscoverViewProps {
   master: Resume | null;
 }
 
-const MATCH_STEPS = [0, 30, 50, 70] as const;
+const MATCH_STEPS = [0, 30, 50, 70, 80] as const;
 const MATCH_KEY = "orbit-min-match";
 
 interface HistoryEntry {
@@ -289,6 +290,14 @@ export function DiscoverView({ initialJobs, filters, mode, budget: initialBudget
       </div>
 
       <FilterBar key={feedFiltersToQuery(filters)} filters={filters} onChange={changeFilters} pending={pending} />
+      {!master && mode === "live" ? (
+        <p className="-mt-2 rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent">
+          Match scores appear once your resume is saved.{" "}
+          <Link href="/resume" className="font-medium underline underline-offset-2 hover:decoration-2">
+            Add your resume
+          </Link>
+        </p>
+      ) : null}
       {hiddenByMatch > 0 ? (
         <p className="-mt-2 text-xs text-muted">
           {hiddenByMatch} loaded job{hiddenByMatch > 1 ? "s" : ""} hidden below {minMatch}% match.{" "}
