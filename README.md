@@ -76,7 +76,7 @@ jobs; sign-in and saving are off.
    deployed URL later), and add `http://localhost:3000/auth/callback` to Redirect URLs.
 4. Copy `apps/web/.env.example` to `apps/web/.env.local` and fill in the project URL and
    anon/publishable key from Project Settings → API.
-5. Optional: set `ALLOWED_EMAILS` to an invite list for you and your friends.
+5. Optional: set `ALLOWED_EMAILS` to an invite list (comma-separated). Leave it empty for open sign-up, and turn on "Allow new users to sign up" in Supabase.
 
 Restart `npm run dev` after editing `.env.local`.
 

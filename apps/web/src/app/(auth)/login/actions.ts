@@ -66,7 +66,8 @@ export async function requestMagicLink(_prev: LoginState, formData: FormData): P
   // First sign-in of someone on the invite list: create their account here, so
   // nobody has to add them in the Supabase dashboard. Only with an explicit
   // list; an empty ALLOWED_EMAILS never creates accounts this way.
-  if (getAllowedEmails().size > 0) {
+  const inviteOnly = getAllowedEmails().size > 0;
+  if (inviteOnly) {
     const account = await ensureInvitedAccount(email);
     if (account === "unavailable" && !canCreateAccounts()) {
       console.warn("New invited emails need SUPABASE_SECRET_KEY on the server to get an account.");
@@ -79,9 +80,10 @@ export async function requestMagicLink(_prev: LoginState, formData: FormData): P
     email,
     options: {
       emailRedirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(next)}`,
-      // Accounts are only ever created above (invite list) or by the owner in
-      // the dashboard. Public sign-up stays disabled in Supabase.
-      shouldCreateUser: false,
+      // Open sign-up (no ALLOWED_EMAILS): a new email gets an account on its
+      // first code; "Allow new users to sign up" must be on in Supabase.
+      // Invite-only: accounts are only created above, never by this call.
+      shouldCreateUser: !inviteOnly,
     },
   });
 
@@ -92,7 +94,11 @@ export async function requestMagicLink(_prev: LoginState, formData: FormData): P
     // Unknown email: answer exactly as for a known one, so the form can't be
     // used to discover who has an account.
     if (error.code === "otp_disabled" || error.code === "signup_disabled" || error.code === "user_not_found") {
-      console.warn("Sign-in skipped: no Supabase user with that email (add it in Authentication → Users).");
+      console.warn(
+        inviteOnly
+          ? "Sign-in skipped: no Supabase user with that email (add it in Authentication → Users)."
+          : "Sign-up blocked: turn on Authentication → Sign In / Providers → Allow new users to sign up in Supabase.",
+      );
       return { status: "sent", email, next };
     }
     console.error("signInWithOtp failed:", error.status, error.code, error.message);
