@@ -9,12 +9,19 @@ import {
 } from "./schema";
 
 /**
- * Best-effort import of a resume pasted as plain text (for example copied
- * out of a PDF). It never guesses facts: every line lands somewhere visible
- * so the user can fix the structure in the editor.
+ * Best-effort import of a resume pasted as plain text or extracted from a
+ * PDF. It never guesses facts: every line lands somewhere visible so the user
+ * can fix the structure in the editor.
+ *
+ * PDFs (LaTeX ones especially) often lose their bullet symbols, so structure
+ * comes from other signals: blank lines between paragraphs, wrapped lines
+ * that run to the full text width, "Project | Tech" and "Role … dates"
+ * header lines, and headings such as "AI and Data Projects".
  */
 
-const HEADINGS: [RegExp, ResumeSectionKind | "skills" | "summary"][] = [
+type HeadingKind = ResumeSectionKind | "skills" | "summary";
+
+const HEADINGS: [RegExp, HeadingKind][] = [
   [/^(work |professional |relevant )?(experience|employment|work history|internships?)$/i, "experience"],
   [/^(personal |academic |selected |side )?projects?$/i, "projects"],
   [/^(education|academic background|studies)$/i, "education"],
@@ -23,19 +30,87 @@ const HEADINGS: [RegExp, ResumeSectionKind | "skills" | "summary"][] = [
   [/^(awards|achievements|honou?rs|certifications?|activities|leadership|volunteering|publications|extracurriculars?|languages)( & \w+| and \w+)?$/i, "custom"],
 ];
 
-const BULLET = /^\s*(?:[-*•▪◦●‣–➢►▸✓✔→»■□]\s*|\d+[.)]\s+)(?=\S)/;
-const DATES = /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+)?(?:19|20)\d{2}\s*(?:[-–—]|to)\s*((?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+)?(?:19|20)\d{2}|present|current|now)|((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+)?(?:19|20)\d{2}/i;
+/** Headings named by their last word: "AI and Data Projects", "Research", "Teaching Experience". */
+const HEADING_TAIL: [RegExp, HeadingKind][] = [
+  [/(projects|research|portfolio)$/i, "projects"],
+  [/(experience|employment|internships|work history)$/i, "experience"],
+  [/(education)$/i, "education"],
+  [/(skills|technologies|tech stack|competencies)$/i, "skills"],
+  [/(summary|profile)$/i, "summary"],
+  [/(certifications|awards|achievements|activities|leadership|volunteering|publications|languages|interests|honou?rs|coursework|courses)$/i, "custom"],
+];
+
+const BULLET = /^\s*(?:[-*•▪◦●‣–➢►▸✓✔→»■□∙·]\s*|\d+[.)]\s+)(?=\S)/;
+const MONTH = "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?\\s+";
+const DATES = new RegExp(
+  `(${MONTH})?(?:19|20)\\d{2}\\s*(?:[-–—]|to)\\s*((?:expected|anticipated|exp\\.)\\s+)?((${MONTH})?(?:19|20)\\d{2}|present|current|now)|((?:expected|anticipated)\\s+)?(${MONTH})?(?:19|20)\\d{2}`,
+  "i",
+);
+const ENDS_WITH_DATE = /((?:19|20)\d{2}|present|current|now)\s*\)?$/i;
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
 const PHONE = /\+?\d[\d\s().-]{7,}\d/;
 const URL = /(?:https?:\/\/)?(?:www\.)?(?:linkedin\.com|github\.com|gitlab\.com|[\w-]+\.(?:dev|io|me|com))\/?[\w\-./?=#%]*/i;
+/** "Budapest, Hungary" or "Remote" at the end of an organisation line. */
+const TRAILING_PLACE = /\s+((?:(?:New|San|Santa|Los|Las|Saint|St\.|Hong|Tel|Kuala|Den|Ho|Rio|Abu|Buenos|Mexico|Cape)\s)?\p{Lu}[\p{L}.'-]+,\s*\p{Lu}[\p{L} .'-]{1,30}|Remote|Hybrid)$/u;
+const ACTION_START = /^(built|designed|developed|implemented|led|created|launched|shipped|improved|reduced|increased|automated|migrated|optimi[sz]ed|wrote|write|deployed|deploying|analy[sz]ed|organi[sz]ed|ran|run|taught|managed|delivered|researched|trained|refactored|integrated|maintained|owned|won|founded|mentored|contributed|cut|moved|added|support(ed)?|coordinat(e|ed)|evaluated|showed|tested|exposed|combined|paired|detected|rebuilt|restructured|containerized|resolved|verified|helped|worked|responsible)\b/i;
 
-function headingKind(line: string): ResumeSectionKind | "skills" | "summary" | null {
+function cleanHeading(line: string): string {
   let clean = line.replace(/[:|]+$/, "").trim();
-  if (clean.length > 40) return null;
   // Letter-spaced headings from designed PDFs: "E X P E R I E N C E".
   if (/^(?:\p{L} ){3,}\p{L}$/u.test(clean)) clean = clean.replace(/ /g, "");
+  return clean;
+}
+
+function headingKind(line: string): HeadingKind | null {
+  const clean = cleanHeading(line);
+  if (clean.length > 45) return null;
   for (const [pattern, kind] of HEADINGS) if (pattern.test(clean)) return kind;
+  // Free-form headings: short, no punctuation or digits, ending in a section word.
+  if (/[\d|:,.;•]/.test(clean) || clean.split(/\s+/).length > 5) return null;
+  for (const [pattern, kind] of HEADING_TAIL) if (pattern.test(clean)) return kind;
   return null;
+}
+
+/** "AI AND DATA PROJECTS" → "AI and Data Projects"-ish; mixed case is kept as written. */
+function headingTitle(line: string): string {
+  const clean = cleanHeading(line);
+  if (clean !== clean.toUpperCase()) return clean.slice(0, 60);
+  return clean
+    .toLowerCase()
+    .replace(/\b\p{L}/gu, (c) => c.toUpperCase())
+    .replace(/\b(And|Of|The|For|In)\b/g, (w) => w.toLowerCase())
+    .replace(/\bAi\b/g, "AI")
+    .slice(0, 60);
+}
+
+/** "Title | Tech, Stack · github.com/x" (a project or research header). */
+function pipeHeader(line: string): Omit<ResumeEntry, "id" | "bullets"> | null {
+  const at = line.indexOf(" | ");
+  if (at <= 0 || at > 110 || ACTION_START.test(line)) return null;
+  const title = line.slice(0, at).trim();
+  const parts = line.slice(at + 3).split(/\s+·\s+/).map((p) => p.trim()).filter(Boolean);
+  const link = parts.slice(1).find((p) => URL.test(p))?.match(URL)?.[0] ?? "";
+  if (DATES.test(line) && ENDS_WITH_DATE.test(line)) return null; // "Role | Company | dates": handled as a dated header
+  return { title: title.slice(0, 160), org: (parts[0] ?? "").slice(0, 160), location: "", dates: "", link: link.slice(0, 300) };
+}
+
+/** A short title-like line: an organisation, a project name, a role without dates. */
+function headerish(line: string): boolean {
+  return (
+    line.length <= 95 &&
+    line.split(/\s+/).length <= 13 &&
+    /^[\p{Lu}\d]/u.test(line) &&
+    !/[:;.!?]$/.test(line) &&
+    !line.includes(":") &&
+    !/\d/.test(line) &&
+    !ACTION_START.test(line)
+  );
+}
+
+function splitPlace(line: string): { name: string; place: string } {
+  const match = line.match(TRAILING_PLACE);
+  if (!match || match.index === undefined || match.index < 3) return { name: line, place: "" };
+  return { name: line.slice(0, match.index).replace(/[,\s]+$/, ""), place: match[1]!.trim() };
 }
 
 function splitEntryLine(line: string): Omit<ResumeEntry, "id" | "bullets"> {
@@ -51,12 +126,49 @@ function splitEntryLine(line: string): Omit<ResumeEntry, "id" | "bullets"> {
   };
 }
 
-export function parseResumeText(input: string): Resume {
-  const lines = input
+/**
+ * Joins lines a PDF wrapped back into one: within a paragraph, a line that
+ * starts mid-sentence or follows a full-width line continues it. Bullets,
+ * headings and header lines always start fresh.
+ */
+function logicalLines(input: string): string[] {
+  const raw = input
     .replace(/\r/g, "")
+    // Control characters some PDFs leave for unmapped glyphs (e.g. accents).
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]\s?/g, "")
     .split("\n")
-    .map((l) => l.replace(/\s+$/, ""))
-    .filter((l) => l.trim());
+    .map((l) => l.replace(/\s+$/, ""));
+  const lengths = raw.map((l) => l.trim().length).filter((n) => n > 0).sort((a, b) => a - b);
+  const p90 = lengths.length >= 12 ? lengths[Math.floor(lengths.length * 0.9)]! : 0;
+  const fullWidth = p90 >= 60 ? p90 * 0.72 : Infinity;
+
+  const out: string[] = [];
+  let previousRaw = "";
+  for (const rawLine of raw) {
+    const line = rawLine.trim();
+    if (!line) {
+      previousRaw = "";
+      continue;
+    }
+    // A word or link hyphenated across lines ("password-" / "strength-analyzer"), even across a blank line.
+    const tail = out[out.length - 1] ?? "";
+    if ((/\w-$/.test(tail) && /^[a-z]/.test(line) && !BULLET.test(rawLine)) || (/\w\/$/.test(tail) && /^[\w.-]+$/.test(line))) {
+      out[out.length - 1] += line;
+      previousRaw = line;
+      continue;
+    }
+    const startsFresh =
+      BULLET.test(rawLine) || headingKind(line) !== null || pipeHeader(line) !== null || (DATES.test(line) && ENDS_WITH_DATE.test(line) && line.length < 140);
+    const continues = previousRaw !== "" && !startsFresh && (/^[a-z(&,;]/.test(line) || previousRaw.length >= fullWidth);
+    if (continues && out.length) out[out.length - 1] = `${out[out.length - 1]} ${line}`.replace(/(\w)- (\w)/g, "$1-$2");
+    else out.push(line);
+    previousRaw = line;
+  }
+  return out;
+}
+
+export function parseResumeText(input: string): Resume {
+  const lines = logicalLines(input);
 
   const resume: Resume = {
     version: 1,
@@ -77,15 +189,16 @@ export function parseResumeText(input: string): Resume {
     resume.sections.push(section);
     entry = null;
   };
+  const addEntry = (fields: Omit<ResumeEntry, "id" | "bullets">) => {
+    entry = { id: newResumeId("e"), ...fields, bullets: [] };
+    (section as unknown as ResumeSection).entries.push(entry);
+  };
 
-  for (const raw of lines.slice(0, 400)) {
-    const line = raw.trim();
+  for (const line of lines.slice(0, 500)) {
     const kind = headingKind(line);
     if (kind) {
       mode = kind;
-      if (kind !== "skills" && kind !== "summary") {
-        openSection(kind, kind === "custom" ? line.replace(/[:|]+$/, "") : SECTION_TITLES[kind]);
-      }
+      if (kind !== "skills" && kind !== "summary") openSection(kind, headingTitle(line));
       continue;
     }
 
@@ -109,12 +222,9 @@ export function parseResumeText(input: string): Resume {
             resume.basics.location = part;
           }
         }
-      }
-      if (!email && !phone && !url) {
-        if (!resume.basics.name) resume.basics.name = line.slice(0, 120);
-        else if (!resume.basics.headline) resume.basics.headline = line.slice(0, 160);
-        else summary.push(line);
-      }
+      } else if (!resume.basics.name) resume.basics.name = line.slice(0, 120);
+      else if (!resume.basics.headline) resume.basics.headline = line.slice(0, 160);
+      else summary.push(line);
       continue;
     }
 
@@ -124,13 +234,14 @@ export function parseResumeText(input: string): Resume {
     }
 
     if (mode === "skills") {
-      const [name, items] = line.includes(":") ? [line.slice(0, line.indexOf(":")), line.slice(line.indexOf(":") + 1)] : ["Skills", line];
-      const list = items!
-        .replace(BULLET, "")
+      const body = line.replace(BULLET, "");
+      const colon = body.indexOf(":");
+      const [name, items] = colon > 0 && colon < 40 ? [body.slice(0, colon), body.slice(colon + 1)] : ["Skills", body];
+      const list = items
         .split(/[,;|•·]/)
         .map((s) => s.trim())
         .filter((s) => s && s.length <= 60);
-      const groupName = name!.replace(BULLET, "").trim().slice(0, 60) || "Skills";
+      const groupName = name.trim().slice(0, 60) || "Skills";
       const existing = resume.skills.find((g) => g.name === groupName);
       if (existing) existing.items.push(...list);
       else if (resume.skills.length < 12) resume.skills.push({ id: newResumeId("k"), name: groupName, items: list });
@@ -139,41 +250,70 @@ export function parseResumeText(input: string): Resume {
 
     // Inside experience, projects, education or a custom section.
     if (!section) openSection(mode, SECTION_TITLES[mode]);
-    const current = section as unknown as ResumeSection;
-    const lastBullet = entry ? (entry as ResumeEntry).bullets.at(-1) : undefined;
-    const wrapped =
-      lastBullet !== undefined &&
-      !BULLET.test(raw) &&
-      !DATES.test(line) &&
-      line.length < 200 &&
-      // Starts mid-sentence, or the bullet above ran to the full line width without ending.
-      (/^[a-z(&,;]/.test(line) || (lastBullet.text.length >= 70 && !/[.!?]$/.test(lastBullet.text) && !/^[A-Z][\w&.,' -]{0,60}$/.test(line)));
-    if (wrapped && lastBullet) {
-      // PDFs break long bullets across lines: glue the rest back on.
-      lastBullet.text = `${lastBullet.text} ${line}`.slice(0, 600);
-    } else if (BULLET.test(raw) || (entry && line.length > 90 && !/((?:19|20)\d{2}|present|current|now)\s*\)?$/i.test(line))) {
-      // A long line ending in dates is the next entry's header, not a bullet.
-      if (!entry) {
-        entry = { id: newResumeId("e"), title: "", org: "", location: "", dates: "", link: "", bullets: [] };
-        current.entries.push(entry);
-      }
-      const target = entry as ResumeEntry;
-      target.bullets.push({ id: newResumeId("b"), text: line.replace(BULLET, "").slice(0, 600) });
-    } else if (entry && !(entry as ResumeEntry).bullets.length && !(entry as ResumeEntry).dates && DATES.test(line)) {
-      // A second header line, typically "Company — City" or the dates.
-      const extra = splitEntryLine(line);
-      const target = entry as ResumeEntry;
-      target.dates = extra.dates;
-      if (!target.org) target.org = extra.title;
-      if (!target.location) target.location = [extra.org, extra.location].filter(Boolean).join(", ");
-    } else {
-      entry = { id: newResumeId("e"), ...splitEntryLine(line), bullets: [] };
-      current.entries.push(entry);
+    const current = entry as ResumeEntry | null;
+    const fresh = current !== null && current.bullets.length === 0;
+
+    if (BULLET.test(line)) {
+      if (!current) addEntry({ title: "", org: "", location: "", dates: "", link: "" });
+      (entry as unknown as ResumeEntry).bullets.push({ id: newResumeId("b"), text: line.replace(BULLET, "").slice(0, 600) });
+      continue;
     }
+    if (current && current.bullets.length && /^[a-z(&,;]/.test(line)) {
+      // Leftover wrap: the sentence continues.
+      const last = current.bullets[current.bullets.length - 1]!;
+      last.text = `${last.text} ${line}`.slice(0, 600);
+      continue;
+    }
+
+    const pipe = pipeHeader(line);
+    if (pipe) {
+      addEntry(pipe);
+      continue;
+    }
+
+    const dated = DATES.test(line) && ENDS_WITH_DATE.test(line) && line.length < 160;
+    if (dated) {
+      const parts = splitEntryLine(line);
+      if (fresh && current && !current.dates) {
+        // Second header line with the dates: "Bachelor of Science … Sep. 2023 – Expected 2027".
+        current.dates = parts.dates;
+        const second = [parts.title, parts.org].filter(Boolean).join(", ");
+        if ((section as unknown as ResumeSection).kind === "education" && /bachelor|master|b\.?sc|m\.?sc|ph\.?d|degree|diploma|engineering|science/i.test(second)) {
+          if (!current.org) current.org = current.title;
+          current.title = second.slice(0, 160);
+        } else if (!current.org) current.org = second.slice(0, 160);
+        else if (!current.location) current.location = second.slice(0, 120);
+      } else {
+        addEntry(parts);
+      }
+      continue;
+    }
+
+    if (headerish(line)) {
+      const { name, place } = splitPlace(line);
+      if (fresh && current) {
+        // "Teaching Assistant, Basics of Programming I  2025 – Present" then
+        // "Budapest University of Technology and Economics  Budapest, Hungary".
+        if (current.org && current.dates && !current.location) {
+          current.title = `${current.title}, ${current.org}`.slice(0, 160);
+          current.org = name.slice(0, 160);
+        } else if (!current.org) current.org = name.slice(0, 160);
+        else current.location = (current.location ? `${current.location}, ${name}` : name).slice(0, 120);
+        if (place && !current.location) current.location = place.slice(0, 120);
+      } else {
+        addEntry({ title: name.slice(0, 160), org: "", location: place.slice(0, 120), dates: "", link: "" });
+      }
+      continue;
+    }
+
+    // Anything else is a sentence: a bullet of the current entry.
+    if (!current) addEntry({ title: "", org: "", location: "", dates: "", link: "" });
+    (entry as unknown as ResumeEntry).bullets.push({ id: newResumeId("b"), text: line.slice(0, 600) });
   }
 
   resume.summary = summary.join(" ").slice(0, 1500);
   for (const group of resume.skills) group.items = [...new Set(group.items)].slice(0, 50);
+  resume.sections = resume.sections.filter((s) => s.entries.length).slice(0, 10);
   for (const s of resume.sections) {
     s.entries = s.entries.slice(0, 25);
     for (const e of s.entries) e.bullets = e.bullets.slice(0, 15);

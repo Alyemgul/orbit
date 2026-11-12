@@ -3,6 +3,7 @@ import { analyzeJob, scoreResume } from "./analyze";
 import { changeRatio, wordDiff } from "./diff";
 import { findKeywords } from "./keywords";
 import { fromJsonResume, parseResumeText } from "./parse";
+import { startsWithActionVerb } from "./health";
 import { buildRewriteMessages, parseRewriteResponse } from "./prompt";
 import { readResume, type Resume } from "./schema";
 import { factCheck, factContext, tailorResume } from "./tailor";
@@ -231,6 +232,87 @@ Teaching Assistant, Data Structures, Budapest University of Technology Budapest 
     expect(resume.sections[0]!.entries[1]!.dates).toBe("Feb 2025 – Present");
   });
 
+  it("splits a LaTeX-style PDF with no bullet symbols into projects and bullets", () => {
+    const wide = (s: string) => s; // lines below are as wide as a real PDF text column
+    const text = [
+      "Jordan Lee",
+      "",
+      "Berlin, Germany | +49 151 0000000 | jordan@example.com | github.com/jordan",
+      "",
+      "Education",
+      "",
+      "Technical University of Somewhere Berlin, Germany",
+      "",
+      "Bachelor of Science in Computer Science Sep. 2023 – Expected 2027",
+      "",
+      "Most recent GPA: 1.7",
+      "",
+      "AI and Data Projects",
+      "",
+      wide("Ledger, Budget Tracking App | TypeScript, Next.js, PostgreSQL, Docker, GitHub Actions · github.com/jordan/"),
+      "ledger",
+      "",
+      wide("Built a full-stack budgeting app that imports bank CSV exports, categorises 5,000+ transactions and charts"),
+      "monthly spending per category for each user",
+      "",
+      wide("Added row-level security and end-to-end tests that run on every pull request in a GitHub Actions workflow"),
+      "",
+      "Chess Engine | C++",
+      "",
+      wide("Wrote a bitboard chess engine with alpha-beta search and a transposition table, reaching 2,100 Elo against"),
+      "Stockfish level 5",
+      "",
+      "Embedded Projects",
+      "",
+      "Smart Plant Monitor | ESP32, C",
+      "",
+      wide("Programmed an ESP32 to read soil moisture every 10 minutes and send alerts over MQTT when plants need water"),
+      "",
+      "Experience",
+      "",
+      "Working Student, Data Team 2025 – Present",
+      "",
+      "Example Analytics GmbH Berlin, Germany",
+      "",
+      wide("Maintain 12 Airflow pipelines that load marketing data into BigQuery, cutting failed runs from weekly to monthly"),
+      "",
+      "Technical Skills",
+      "",
+      wide("Languages: Python, TypeScript, C++, SQL, Kotlin, Java, Go, Rust, Bash, HTML, CSS, R, MATLAB, Scala, Haskell,"),
+      "(learning) Zig",
+    ].join("\n");
+    const resume = parseResumeText(text);
+    expect(resume.sections.map((s) => `${s.kind}:${s.title}`)).toEqual([
+      "education:Education",
+      "projects:AI and Data Projects",
+      "projects:Embedded Projects",
+      "experience:Experience",
+    ]);
+    const [education, ai, embedded, experience] = resume.sections;
+    expect(education!.entries[0]).toMatchObject({
+      title: "Bachelor of Science in Computer Science",
+      org: "Technical University of Somewhere",
+      location: "Berlin, Germany",
+      dates: "Sep. 2023 – Expected 2027",
+    });
+    expect(ai!.entries.map((e) => [e.title, e.org, e.bullets.length])).toEqual([
+      ["Ledger, Budget Tracking App", "TypeScript, Next.js, PostgreSQL, Docker, GitHub Actions", 2],
+      ["Chess Engine", "C++", 1],
+    ]);
+    expect(ai!.entries[0]!.link).toBe("github.com/jordan/ledger");
+    expect(ai!.entries[0]!.bullets[0]!.text).toMatch(/charts monthly spending per category for each user$/);
+    expect(ai!.entries[1]!.bullets[0]!.text).toMatch(/against Stockfish level 5$/);
+    expect(embedded!.entries[0]).toMatchObject({ title: "Smart Plant Monitor", org: "ESP32, C" });
+    expect(experience!.entries[0]).toMatchObject({
+      title: "Working Student, Data Team",
+      org: "Example Analytics GmbH",
+      location: "Berlin, Germany",
+      dates: "2025 – Present",
+    });
+    expect(experience!.entries[0]!.bullets).toHaveLength(1);
+    expect(resume.skills[0]!.items).toContain("(learning) Zig");
+  });
+
   it("imports every section of hand-written resume JSON, not just basics", () => {
     const resume = fromJsonResume({
       basics: { firstName: "Sam", lastName: "Rivera", email: "sam@example.com", summary: "CSE student." },
@@ -293,5 +375,22 @@ describe("rewrite prompt", () => {
     const reply = 'Sure! {"summary": null, "bullets": [{"id": "b2", "text": "Developed a Python service"}, {"id": "zzz", "text": "hi"}, {"id": "b1", "text": "Organised the team\'s weekly demo meetings"}]}';
     expect(parseRewriteResponse(reply, master)).toEqual({ summary: null, rewrites: { b2: "Developed a Python service" } });
     expect(parseRewriteResponse("no json here", master)).toBeNull();
+  });
+});
+
+describe("resume health", () => {
+  it.each([
+    ["Evaluated 7 detectors", true],
+    ["Containerized the server", true],
+    ["Rebuilt core Docker features", true],
+    ["Support students learning", true],
+    ["Deploying to Kubernetes", true],
+    ["Wrote REST endpoints", true],
+    ["Responsible for testing", false],
+    ["Most recent semester GPA", false],
+    ["Experienced in Python", false],
+    ["Using React, built a site", false],
+  ] as const)("%s starts with an action verb: %s", (text, expected) => {
+    expect(startsWithActionVerb(text)).toBe(expected);
   });
 });

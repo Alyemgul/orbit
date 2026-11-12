@@ -14,6 +14,7 @@ export * from "./resume/analyze";
 export * from "./resume/diff";
 export * from "./resume/tailor";
 export * from "./resume/parse";
+export * from "./resume/health";
 export * from "./resume/prompt";
 export * from "./autopilot/questions";
 export * from "./autopilot/fields";

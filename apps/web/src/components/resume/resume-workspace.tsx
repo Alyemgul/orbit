@@ -1,6 +1,6 @@
 "use client";
 
-import { emptyResume, fromJsonResume, parseResumeText, resumeBullets, resumeSchema, type Resume } from "@orbit/core";
+import { emptyResume, resumeHealth, resumeSchema, type Resume } from "@orbit/core";
 import { Download, Eye, FileUp, PencilLine, Save, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type Ref } from "react";
@@ -195,23 +195,3 @@ export function ResumeWorkspace({ mode, initial, updatedAt, versions }: ResumeWo
   );
 }
 
-const ACTION_VERB = /^(built|designed|developed|implemented|led|created|launched|shipped|improved|reduced|increased|automated|migrated|optimi[sz]ed|wrote|deployed|analy[sz]ed|organi[sz]ed|ran|taught|managed|delivered|researched|trained|refactored|integrated|maintained|owned|won|founded|mentored|contributed|cut|moved|added)\b/i;
-
-function resumeHealth(resume: Resume) {
-  const bullets = resumeBullets(resume).map((b) => b.bullet.text).filter(Boolean);
-  const withNumber = bullets.filter((t) => /\d/.test(t)).length;
-  const withVerb = bullets.filter((t) => ACTION_VERB.test(t.trim())).length;
-  const long = bullets.filter((t) => t.split(/\s+/).length > 35).length;
-  const skills = resume.skills.reduce((n, g) => n + g.items.length, 0);
-  const share = (n: number) => (bullets.length ? n / bullets.length : 0);
-
-  const checks = [
-    { ok: Boolean(resume.basics.name && resume.basics.email), label: "Name and email filled in" },
-    { ok: bullets.length >= 6, label: `At least 6 bullets (${bullets.length})` },
-    { ok: share(withNumber) >= 0.5, label: `Half your bullets show a number or result (${withNumber}/${bullets.length})` },
-    { ok: share(withVerb) >= 0.7, label: `Bullets start with an action verb (${withVerb}/${bullets.length})` },
-    { ok: long === 0, label: long ? `${long} bullet${long > 1 ? "s" : ""} over 35 words` : "Bullets are short enough to skim" },
-    { ok: skills >= 6, label: `6+ skills listed (${skills})` },
-  ];
-  return { score: Math.round((checks.filter((c) => c.ok).length / checks.length) * 100), checks, bullets: bullets.length, skills };
-}
