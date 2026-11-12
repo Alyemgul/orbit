@@ -186,7 +186,7 @@ export function TailorView({ mode, applicationId, job, master: initialMaster, la
           ))}
         </div>
         <Button variant="secondary" size="sm" onClick={() => void runAi()} disabled={!aiLabel || busy !== null || mode === "demo" || aiLeft === 0}
-          title={!aiLabel ? "Set LLM_PROVIDER and LLM_API_KEY to turn on AI rewording (free providers)" : undefined}>
+          title={!aiLabel ? "Set GROQ_API_KEY and/or GEMINI_API_KEY to turn on AI rewording (free providers)" : undefined}>
           <Sparkles /> {busy === "ai" ? "Rewording…" : aiLabel ? `Reword with ${aiLabel}` : "AI rewording off"}
         </Button>
         {aiLeft !== null && aiLabel ? <span className="text-xs text-muted">{aiLeft} left today</span> : null}

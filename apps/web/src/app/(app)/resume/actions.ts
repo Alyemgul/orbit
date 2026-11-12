@@ -95,7 +95,7 @@ export async function rewriteWithAi(applicationId: unknown, fresh: unknown = fal
     const analysis = analyzeJob(context.job.title, context.job.description);
     const reply = await chatJson(config, buildRewriteMessages(master.resume, context.job, analysis));
     const proposal = parseRewriteResponse(reply.content, master.resume);
-    if (!proposal) return { ok: false, error: `${config.label} replied in a format Orbit couldn't read. Try again.` };
+    if (!proposal) return { ok: false, error: `${reply.label} replied in a format Orbit couldn't read. Try again.` };
     const result = { ...proposal, model: reply.model };
     const saved = await supabase.rpc("save_llm_result", {
       p_call_id: callId,

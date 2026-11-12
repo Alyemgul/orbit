@@ -47,7 +47,7 @@ export default async function TailorPage({ params }: { params: Params }) {
         job={context.job}
         master={master?.resume ?? null}
         latest={context.latest}
-        aiLabel={llm?.label ?? null}
+        aiLabel={llm ? llm.chain.map((p) => p.label).join(" + ") : null}
         aiUsage={llm ? usage : null}
       />
     </>

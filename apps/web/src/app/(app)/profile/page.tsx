@@ -71,8 +71,8 @@ export default async function ProfilePage() {
             <CardTitle>AI rewording</CardTitle>
             <CardDescription>
               {llm
-                ? `Using ${llm.label} (${llm.model}${llm.fallbackModel ? `, falls back to ${llm.fallbackModel}` : ""}). Repeat requests for the same job reuse earlier answers for free.`
-                : "Off. Add LLM_PROVIDER (groq) and LLM_API_KEY (a free key from console.groq.com) to your host's environment variables, e.g. Vercel → Settings → Environment Variables, then redeploy."}
+                ? `Using ${llm.chain.map((p) => `${p.label} (${p.model}${p.fallbackModel ? ` → ${p.fallbackModel}` : ""})`).join(", then ")}. When one free limit runs out, the next takes over. Repeat requests for the same job reuse earlier answers for free.`
+                : "Off. Add GROQ_API_KEY (free at console.groq.com) and/or GEMINI_API_KEY (free at aistudio.google.com) to your host's environment variables, e.g. Vercel → Settings → Environment Variables, then redeploy."}
             </CardDescription>
           </CardHeader>
           {llm && usage ? (

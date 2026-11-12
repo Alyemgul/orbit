@@ -82,14 +82,19 @@ Restart `npm run dev` after editing `.env.local`.
 
 ## Optional: AI rewording (free)
 
-Tailoring works without any AI. To add AI rewording, pick one free provider and add two
-lines to `apps/web/.env.local` (server-only; never prefix these with `NEXT_PUBLIC_`):
+Tailoring works without any AI. To add AI rewording, add one or both free keys to
+`apps/web/.env.local` or your host's environment variables (server-only; never prefix these
+with `NEXT_PUBLIC_`). With both, Groq is tried first and Gemini takes over when Groq's free
+limit runs out, roughly doubling the free daily quota.
 
-| Provider | Get a key | `.env.local` |
+| Provider | Get a key | Variable |
 |---|---|---|
-| Groq (recommended) | console.groq.com → API Keys (free, no card) | `LLM_PROVIDER=groq` and `LLM_API_KEY=...` |
-| Google Gemini | aistudio.google.com → Get API key (free tier) | `LLM_PROVIDER=gemini` and `LLM_API_KEY=...` |
+| Groq (recommended) | console.groq.com → API Keys (free, no card) | `GROQ_API_KEY=...` |
+| Google Gemini | aistudio.google.com → Get API key (free tier) | `GEMINI_API_KEY=...` |
 | Ollama (fully local, private) | install from ollama.com, then `ollama pull llama3.1:8b` | `LLM_PROVIDER=ollama` |
+
+`LLM_PROVIDER=gemini` makes Gemini go first; `LLM_PROVIDER=none` turns AI off. The older
+`LLM_PROVIDER` + `LLM_API_KEY` pair still works.
 
 `LLM_MODEL` overrides the default model if a provider renames or retires it. Only your
 bullets, summary and the job post are sent: never your name, email, phone or links.
