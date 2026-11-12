@@ -4,7 +4,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { isSupabaseConfigured } from "@/lib/env";
-import { isEmailAllowed } from "@/lib/env.server";
+import { getAllowedEmails, isEmailAllowed } from "@/lib/env.server";
+import { canCreateAccounts, ensureInvitedAccount } from "@/lib/supabase/admin.server";
 import { safeRedirectPath } from "@/lib/safe-redirect";
 import { createClient } from "@/lib/supabase/server";
 
@@ -62,14 +63,24 @@ export async function requestMagicLink(_prev: LoginState, formData: FormData): P
     return { status: "sent", email, next };
   }
 
+  // First sign-in of someone on the invite list: create their account here, so
+  // nobody has to add them in the Supabase dashboard. Only with an explicit
+  // list; an empty ALLOWED_EMAILS never creates accounts this way.
+  if (getAllowedEmails().size > 0) {
+    const account = await ensureInvitedAccount(email);
+    if (account === "unavailable" && !canCreateAccounts()) {
+      console.warn("New invited emails need SUPABASE_SECRET_KEY on the server to get an account.");
+    }
+  }
+
   const siteUrl = await resolveSiteUrl();
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
       emailRedirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(next)}`,
-      // Invite-only: accounts are created by the owner in the Supabase dashboard.
-      // Public sign-up is also disabled there, so this is enforced server-side too.
+      // Accounts are only ever created above (invite list) or by the owner in
+      // the dashboard. Public sign-up stays disabled in Supabase.
       shouldCreateUser: false,
     },
   });

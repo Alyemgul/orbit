@@ -174,6 +174,30 @@ Tools: Docker, Git`);
     ]);
   });
 
+  it("handles PDF-style text: wrapped bullets, odd glyphs, spaced headings", () => {
+    const resume = parseResumeText(`Sam Rivera
+sam@example.com
+
+E X P E R I E N C E
+Backend Intern | Acme | 2025 – 2025
+● Designed and shipped an internal billing service in Go that processed invoices for
+three regional offices and cut manual work by 30%
+➢ Wrote integration tests
+Data Analyst | Beta Corp | 2024 – 2025
+• Built dashboards
+
+Technical Skills & Tools
+Python, SQL`);
+    const [first, second] = resume.sections[0]!.entries;
+    expect(resume.sections[0]!.kind).toBe("experience");
+    expect(first!.bullets.map((b) => b.text)).toEqual([
+      "Designed and shipped an internal billing service in Go that processed invoices for three regional offices and cut manual work by 30%",
+      "Wrote integration tests",
+    ]);
+    expect(second).toMatchObject({ title: "Data Analyst", org: "Beta Corp" });
+    expect(resume.skills[0]!.items).toEqual(["Python", "SQL"]);
+  });
+
   it("imports JSON Resume", () => {
     const resume = fromJsonResume({
       basics: { name: "Sam", email: "sam@example.com", profiles: [{ network: "GitHub", url: "https://github.com/samr" }] },
@@ -183,6 +207,63 @@ Tools: Docker, Git`);
     expect(resume?.sections[0]?.entries[0]).toMatchObject({ title: "Intern", org: "Acme", dates: "2025-06 – Present" });
     expect(resume?.basics.links).toEqual([{ label: "GitHub", url: "https://github.com/samr" }]);
     expect(fromJsonResume({ hello: 1 })).toBeNull();
+  });
+
+  it("reads text extracted from a PDF: contact line, long entry headers", () => {
+    const resume = parseResumeText(`Alex Novak
+CSE student
+alex@example.com | Budapest, Hungary | github.com/alex | linkedin.com/in/alex
+EXPERIENCE
+Software Engineering Intern, Riverline Payments Budapest | Jun 2025 – Sep 2025
+• Built a Python service that reconciles card settlements, cutting manual checks by 40%
+• Wrote REST endpoints in TypeScript and added integration tests that run in CI/CD
+Teaching Assistant, Data Structures, Budapest University of Technology Budapest | Feb 2025 – Present
+• Run weekly labs for 30 students`);
+    expect(resume.basics.location).toBe("Budapest, Hungary");
+    expect(resume.basics.links.map((l) => l.label)).toEqual(["GitHub", "LinkedIn"]);
+    expect(resume.sections[0]!.entries.map((e) => e.bullets.length)).toEqual([2, 1]);
+    expect(resume.sections[0]!.entries[1]!.dates).toBe("Feb 2025 – Present");
+  });
+
+  it("imports every section of hand-written resume JSON, not just basics", () => {
+    const resume = fromJsonResume({
+      basics: { firstName: "Sam", lastName: "Rivera", email: "sam@example.com", summary: "CSE student." },
+      experience: [
+        { company: "Acme", role: "Backend Intern", start: "2025-06", end: "2025-09", description: "Built a Go service\nCut costs by 20%" },
+      ],
+      projects: [{ name: "Orbit", technologies: ["Next.js", "Postgres"], highlights: ["Job platform"] }],
+      education: [{ school: "BME", degree: "BSc", field: "Computer Science", gpa: "4.6" }],
+      certifications: [{ name: "AWS Cloud Practitioner", issuer: "Amazon", date: "2025" }],
+      awards: ["Hackathon winner 2024"],
+      languages: [{ language: "English", fluency: "C1" }],
+      skills: { Languages: ["Python", "Go"], Tools: "Docker, Git" },
+    })!;
+    expect(resume.basics.name).toBe("Sam Rivera");
+    expect(resume.summary).toBe("CSE student.");
+    expect(resume.sections.map((s) => s.title)).toEqual(["Education", "Experience", "Projects", "Certifications", "Awards", "Languages"]);
+    expect(resume.sections[1]!.entries[0]).toMatchObject({ title: "Backend Intern", org: "Acme", dates: "2025-06 – 2025-09" });
+    expect(resume.sections[1]!.entries[0]!.bullets.map((b) => b.text)).toEqual(["Built a Go service", "Cut costs by 20%"]);
+    expect(resume.sections[0]!.entries[0]).toMatchObject({ title: "BSc, Computer Science", org: "BME" });
+    expect(resume.skills.map((g) => [g.name, g.items])).toEqual([
+      ["Languages", ["Python", "Go"]],
+      ["Tools", ["Docker", "Git"]],
+    ]);
+  });
+
+  it("imports Reactive Resume exports", () => {
+    const resume = fromJsonResume({
+      basics: { name: "Sam", email: "sam@example.com" },
+      sections: {
+        summary: { content: "<p>Hello</p>" },
+        experience: { name: "Experience", items: [{ company: "Acme", position: "Intern", date: "2025", summary: "<ul><li>Did A</li><li>Did B</li></ul>" }] },
+        skills: { items: [{ name: "Backend", keywords: ["Go"] }] },
+        awards: { name: "Awards", visible: true, items: [{ title: "Best project", awarder: "BME" }] },
+      },
+    })!;
+    expect(resume.summary).toBe("Hello");
+    expect(resume.sections.map((s) => s.title)).toEqual(["Experience", "Awards"]);
+    expect(resume.sections[0]!.entries[0]!.bullets.map((b) => b.text)).toEqual(["Did A", "Did B"]);
+    expect(resume.skills[0]).toMatchObject({ name: "Backend", items: ["Go"] });
   });
 
   it("rejects unreadable stored content", () => {

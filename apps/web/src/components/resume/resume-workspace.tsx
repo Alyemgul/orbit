@@ -14,6 +14,7 @@ import type { VersionListItem } from "@/lib/resume.server";
 import { downloadResumePdf } from "@/lib/download-pdf";
 import { cn } from "@/lib/utils";
 import { PrintableResume, ResumeDocument } from "./resume-document";
+import { ImportDialog } from "./import-dialog";
 import { ResumeEditor } from "./resume-editor";
 
 interface ResumeWorkspaceProps {
@@ -183,7 +184,6 @@ export function ResumeWorkspace({ mode, initial, updatedAt, versions }: ResumeWo
       <ImportDialog
         ref={importRef}
         onImport={(next) => {
-          if (resumeBullets(resume).some((b) => b.bullet.text) && !window.confirm("Replace what's in the editor with the import?")) return;
           setResume(next);
           setDirty(true);
           setTab("edit");
@@ -192,51 +192,6 @@ export function ResumeWorkspace({ mode, initial, updatedAt, versions }: ResumeWo
       />
       <PrintableResume resume={resume} />
     </div>
-  );
-}
-
-function ImportDialog({ ref, onImport }: { ref: Ref<HTMLDialogElement>; onImport: (resume: Resume) => void }) {
-  const [text, setText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  function run(dialog: HTMLDialogElement | null) {
-    const trimmed = text.trim();
-    if (!trimmed) return setError("Paste your resume first.");
-    let next: Resume | null = null;
-    if (trimmed.startsWith("{")) {
-      try {
-        next = fromJsonResume(JSON.parse(trimmed)) ?? resumeSchema.safeParse(JSON.parse(trimmed)).data ?? null;
-      } catch {
-        return setError("That looks like JSON but couldn't be read.");
-      }
-      if (!next) return setError("That JSON isn't a JSON Resume or Orbit resume.");
-    } else {
-      next = parseResumeText(trimmed);
-    }
-    setError(null);
-    setText("");
-    dialog?.close();
-    onImport(next);
-  }
-
-  return (
-    <dialog ref={ref} aria-labelledby="import-title"
-      className="m-auto w-[min(40rem,calc(100vw-2rem))] rounded-2xl border bg-surface p-0 text-text shadow-card backdrop:bg-black/50">
-      <form method="dialog" className="flex flex-col gap-3 p-5" onSubmit={(e) => { e.preventDefault(); run(e.currentTarget.closest("dialog")); }}>
-        <h2 id="import-title" className="text-base font-semibold">Import your resume</h2>
-        <p className="text-sm text-muted">
-          Open your current CV (PDF or Word), select all, copy, and paste here. JSON Resume files work too. It's read in your
-          browser; nothing is sent anywhere until you press Save.
-        </p>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={12} maxLength={60_000} aria-label="Resume text"
-          className="w-full rounded-lg border bg-bg p-3 font-mono text-xs leading-relaxed" placeholder={"Alex Novak\nalex@example.com | github.com/alex\n\nEducation\n…"} />
-        {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={(e) => e.currentTarget.closest("dialog")?.close()}>Cancel</Button>
-          <Button type="submit">Import</Button>
-        </div>
-      </form>
-    </dialog>
   );
 }
 

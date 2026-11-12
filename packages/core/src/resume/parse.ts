@@ -18,20 +18,22 @@ const HEADINGS: [RegExp, ResumeSectionKind | "skills" | "summary"][] = [
   [/^(work |professional |relevant )?(experience|employment|work history|internships?)$/i, "experience"],
   [/^(personal |academic |selected |side )?projects?$/i, "projects"],
   [/^(education|academic background|studies)$/i, "education"],
-  [/^(technical |core )?(skills|technologies|tech stack|tools)( & tools| and tools)?$/i, "skills"],
+  [/^(technical |core |key |it )?(skills|technologies|tech stack|tools|competencies|programming languages)(\s*(&|and)\s*[\w ]{2,20})?$/i, "skills"],
   [/^(summary|profile|about( me)?|objective|professional summary)$/i, "summary"],
   [/^(awards|achievements|honou?rs|certifications?|activities|leadership|volunteering|publications|extracurriculars?|languages)( & \w+| and \w+)?$/i, "custom"],
 ];
 
-const BULLET = /^\s*(?:[-*•▪◦●‣–]|\d+[.)])\s+/;
+const BULLET = /^\s*(?:[-*•▪◦●‣–➢►▸✓✔→»■□]\s*|\d+[.)]\s+)(?=\S)/;
 const DATES = /((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+)?(?:19|20)\d{2}\s*(?:[-–—]|to)\s*((?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+)?(?:19|20)\d{2}|present|current|now)|((?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+)?(?:19|20)\d{2}/i;
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
 const PHONE = /\+?\d[\d\s().-]{7,}\d/;
 const URL = /(?:https?:\/\/)?(?:www\.)?(?:linkedin\.com|github\.com|gitlab\.com|[\w-]+\.(?:dev|io|me|com))\/?[\w\-./?=#%]*/i;
 
 function headingKind(line: string): ResumeSectionKind | "skills" | "summary" | null {
-  const clean = line.replace(/[:|]+$/, "").trim();
+  let clean = line.replace(/[:|]+$/, "").trim();
   if (clean.length > 40) return null;
+  // Letter-spaced headings from designed PDFs: "E X P E R I E N C E".
+  if (/^(?:\p{L} ){3,}\p{L}$/u.test(clean)) clean = clean.replace(/ /g, "");
   for (const [pattern, kind] of HEADINGS) if (pattern.test(clean)) return kind;
   return null;
 }
@@ -93,9 +95,20 @@ export function parseResumeText(input: string): Resume {
       const url = line.replace(EMAIL, "").match(URL)?.[0];
       if (email && !resume.basics.email) resume.basics.email = email;
       if (phone && !resume.basics.phone) resume.basics.phone = phone.trim();
-      if (url && resume.basics.links.length < 6) {
-        const label = /linkedin/i.test(url) ? "LinkedIn" : /github/i.test(url) ? "GitHub" : "Website";
-        resume.basics.links.push({ label, url });
+      if (email || phone || url) {
+        // A contact line like "a@b.com | Budapest, Hungary | github.com/a | linkedin.com/in/a".
+        for (const part of line.split(/\s+[|·•]\s+|\s{3,}/).map((p) => p.trim()).filter(Boolean)) {
+          const partUrl = part.replace(EMAIL, "").match(URL)?.[0];
+          if (EMAIL.test(part) || (PHONE.test(part) && /^\+?[\d\s().-]+$/.test(part))) continue;
+          if (partUrl) {
+            if (resume.basics.links.length < 6 && !resume.basics.links.some((l) => l.url === partUrl)) {
+              const label = /linkedin/i.test(partUrl) ? "LinkedIn" : /github/i.test(partUrl) ? "GitHub" : "Website";
+              resume.basics.links.push({ label, url: partUrl });
+            }
+          } else if (!resume.basics.location && /\p{L}/u.test(part) && part.length <= 60) {
+            resume.basics.location = part;
+          }
+        }
       }
       if (!email && !phone && !url) {
         if (!resume.basics.name) resume.basics.name = line.slice(0, 120);
@@ -127,7 +140,19 @@ export function parseResumeText(input: string): Resume {
     // Inside experience, projects, education or a custom section.
     if (!section) openSection(mode, SECTION_TITLES[mode]);
     const current = section as unknown as ResumeSection;
-    if (BULLET.test(raw) || (entry && line.length > 90)) {
+    const lastBullet = entry ? (entry as ResumeEntry).bullets.at(-1) : undefined;
+    const wrapped =
+      lastBullet !== undefined &&
+      !BULLET.test(raw) &&
+      !DATES.test(line) &&
+      line.length < 200 &&
+      // Starts mid-sentence, or the bullet above ran to the full line width without ending.
+      (/^[a-z(&,;]/.test(line) || (lastBullet.text.length >= 70 && !/[.!?]$/.test(lastBullet.text) && !/^[A-Z][\w&.,' -]{0,60}$/.test(line)));
+    if (wrapped && lastBullet) {
+      // PDFs break long bullets across lines: glue the rest back on.
+      lastBullet.text = `${lastBullet.text} ${line}`.slice(0, 600);
+    } else if (BULLET.test(raw) || (entry && line.length > 90 && !/((?:19|20)\d{2}|present|current|now)\s*\)?$/i.test(line))) {
+      // A long line ending in dates is the next entry's header, not a bullet.
       if (!entry) {
         entry = { id: newResumeId("e"), title: "", org: "", location: "", dates: "", link: "", bullets: [] };
         current.entries.push(entry);
@@ -156,77 +181,251 @@ export function parseResumeText(input: string): Resume {
   return resumeSchema.parse(resume);
 }
 
-/** Imports the community JSON Resume format (jsonresume.org). */
-export function fromJsonResume(value: unknown): Resume | null {
-  if (!value || typeof value !== "object") return null;
-  const data = value as Record<string, any>;
-  if (!data.basics && !data.work && !data.education) return null;
-  const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
-  const list = (v: unknown): any[] => (Array.isArray(v) ? v : []);
-  const range = (item: any) => [text(item.startDate, 20), text(item.endDate, 20) || (item.startDate ? "Present" : "")].filter(Boolean).join(" – ");
-  const bullets = (items: unknown) =>
-    list(items)
-      .map((h) => text(h, 600))
-      .filter(Boolean)
-      .slice(0, 15)
-      .map((t) => ({ id: newResumeId("b"), text: t }));
+/* -------------------------------------------------------------------------- */
+/* JSON import                                                                */
+/* -------------------------------------------------------------------------- */
 
-  const basics = data.basics ?? {};
+type Json = Record<string, unknown>;
+
+const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);
+const asList = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+
+function stripHtml(value: string): string {
+  return value
+    .replace(/<\s*(br|\/p|\/li|\/div|\/h\d)\s*\/?>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "\n• ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+/** A readable one-line string from a string, number, or {name}/{text}-like object. */
+function str(v: unknown, max: number): string {
+  if (typeof v === "number") return String(v).slice(0, max);
+  if (typeof v === "string") return stripHtml(v).replace(/\s+/g, " ").trim().slice(0, max);
+  if (isObject(v)) return str(v.name ?? v.text ?? v.value ?? v.label ?? v.title, max);
+  return "";
+}
+
+function pick(item: Json, keys: string[], max: number, skip: string): [string, string] {
+  for (const key of keys) {
+    if (key === skip) continue;
+    const value = str(item[key], max);
+    if (value) return [value, key];
+  }
+  return ["", ""];
+}
+
+function placeOf(v: unknown): string {
+  if (isObject(v)) {
+    return [v.city, v.region, v.countryCode ?? v.country].map((p) => str(p, 60)).filter(Boolean).join(", ").slice(0, 120);
+  }
+  return str(v, 120);
+}
+
+function datesOf(item: Json): string {
+  if (isObject(item.date)) return datesOf(item.date);
+  const direct = str(item.dates ?? item.date ?? item.period ?? item.duration ?? item.year ?? item.releaseDate, 60);
+  if (direct) return direct;
+  const start = str(item.startDate ?? item.start ?? item.from ?? item.start_date, 25);
+  const end = str(item.endDate ?? item.end ?? item.to ?? item.end_date, 25) || (item.current === true ? "Present" : "");
+  if (!start && !end) return "";
+  return [start, end || "Present"].filter(Boolean).join(" – ").slice(0, 60);
+}
+
+const BULLET_KEYS = ["summary", "description", "highlights", "bullets", "achievements", "accomplishments", "responsibilities", "tasks", "details", "points", "content"];
+
+/** Bullets from arrays of strings, or a description split on lines and bullet marks. */
+function bulletsOf(item: Json): { id: string; text: string }[] {
+  const out: string[] = [];
+  const add = (v: unknown): void => {
+    if (Array.isArray(v)) {
+      v.forEach(add);
+      return;
+    }
+    if (isObject(v)) {
+      add(v.text ?? v.description ?? v.name ?? v.title);
+      return;
+    }
+    if (typeof v !== "string") return;
+    for (const part of stripHtml(v).split(/\n|\s[•●▪◦‣➢►]\s+/)) {
+      const clean = part.replace(BULLET, "").replace(/\s+/g, " ").trim();
+      if (clean) out.push(clean);
+    }
+  };
+  for (const key of BULLET_KEYS) add(item[key]);
+  const courses = asList(item.courses).map((c) => str(c, 80)).filter(Boolean);
+  if (courses.length) out.push(`Courses: ${courses.join(", ")}`);
+  const score = str(item.score ?? item.gpa ?? item.grade, 30);
+  if (score) out.push(`GPA: ${score}`);
+  const keywords = asList(item.keywords ?? item.technologies ?? item.stack ?? item.tools).map((k) => str(k, 40)).filter(Boolean);
+  if (keywords.length) out.push(`Tech: ${keywords.join(", ")}`);
+  return [...new Set(out)].slice(0, 15).map((text) => ({ id: newResumeId("b"), text: text.slice(0, 600) }));
+}
+
+const TITLE_KEYS = ["position", "role", "jobTitle", "title", "degree", "studyType", "award", "certificate", "label", "name", "language"];
+const ORG_KEYS = ["company", "employer", "organization", "organisation", "institution", "school", "university", "issuer", "awarder", "publisher", "entity", "client", "name", "fluency", "level"];
+
+function entryOf(raw: unknown, kind: ResumeSectionKind): ResumeEntry | null {
+  if (typeof raw === "string") {
+    const text = str(raw, 160);
+    return text ? { id: newResumeId("e"), title: text, org: "", location: "", dates: "", link: "", bullets: [] } : null;
+  }
+  if (!isObject(raw)) return null;
+  if (raw.visible === false || raw.hidden === true) return null;
+  let [title, titleKey] = pick(raw, TITLE_KEYS, 160, "");
+  if (kind === "education") {
+    const area = str(raw.area ?? raw.field ?? raw.fieldOfStudy ?? raw.major, 80);
+    const degree = str(raw.studyType ?? raw.degree, 80);
+    if (degree || area) {
+      title = [degree, area].filter(Boolean).join(", ").slice(0, 160);
+      titleKey = "degree";
+    }
+  }
+  const [org] = pick(raw, ORG_KEYS, 160, titleKey);
+  const url = raw.url ?? raw.link ?? raw.website;
+  const entry: ResumeEntry = {
+    id: newResumeId("e"),
+    title,
+    org: org === title ? "" : org,
+    location: placeOf(raw.location ?? raw.place ?? raw.city),
+    dates: datesOf(raw),
+    link: str(isObject(url) ? url.href : url, 300),
+    bullets: bulletsOf(raw),
+  };
+  return entry.title || entry.org || entry.bullets.length ? entry : null;
+}
+
+function sectionKind(key: string): ResumeSectionKind {
+  if (/work|experience|employment|job|internship|career|position/i.test(key)) return "experience";
+  if (/project|portfolio/i.test(key)) return "projects";
+  if (/education|stud(y|ies)|school|academic|degree/i.test(key)) return "education";
+  return "custom";
+}
+
+function humanize(key: string): string {
+  const spaced = key.replace(/[_-]+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").trim();
+  return (spaced.charAt(0).toUpperCase() + spaced.slice(1)).slice(0, 60);
+}
+
+const NOT_SECTIONS = /^(basics|personal(info|details)?|contact|header|profile|meta|metadata|settings|theme|skills?|technicalSkills|skillGroups|links|profiles|socials|summary|about|objective|id|\$schema)$/i;
+
+function skillGroupsOf(data: Json): Resume["skills"] {
+  const groups: Resume["skills"] = [];
+  const push = (name: string, items: unknown) => {
+    const raw = Array.isArray(items) ? items : typeof items === "string" ? items.split(/[,;|•·]/) : [];
+    const list = raw.map((k) => str(isObject(k) ? (k.name ?? k.keyword ?? k.skill) : k, 60)).filter(Boolean);
+    if (list.length && groups.length < 12) {
+      groups.push({ id: newResumeId("k"), name: name.slice(0, 60) || "Skills", items: [...new Set(list)].slice(0, 50) });
+    }
+  };
+  for (const key of ["skills", "technicalSkills", "skillGroups"]) {
+    const holder = data[key];
+    const value = isObject(holder) && Array.isArray(holder.items) ? holder.items : holder;
+    if (Array.isArray(value)) {
+      if (value.every((v) => typeof v === "string")) {
+        push("Skills", value);
+        continue;
+      }
+      const loose: unknown[] = [];
+      for (const group of value) {
+        const items = isObject(group) ? (group.keywords ?? group.items ?? group.skills ?? group.list) : undefined;
+        if (isObject(group) && items) push(str(group.name ?? group.category ?? group.title, 60), items);
+        else loose.push(group);
+      }
+      if (loose.length) push("Skills", loose);
+    } else if (isObject(value)) {
+      for (const [name, items] of Object.entries(value)) push(humanize(name), items);
+    } else if (typeof value === "string") {
+      push("Skills", value);
+    }
+  }
+  return groups;
+}
+
+function firstObject(...values: unknown[]): Json | null {
+  for (const v of values) if (isObject(v)) return v;
+  return null;
+}
+
+/**
+ * Imports resume JSON from most tools: JSON Resume (jsonresume.org), Reactive
+ * Resume, and hand-written JSON with sections like "experience", "projects",
+ * "awards" or "certifications". Every list of entries becomes a section, so
+ * nothing in the file is silently dropped.
+ */
+export function fromJsonResume(value: unknown): Resume | null {
+  if (!isObject(value)) return null;
+  const data = firstObject(value.resume, value.data) ?? value;
+  const basics = firstObject(data.basics, data.personal, data.personalInfo, data.personalDetails, data.contact, data.header) ?? data;
+
+  const fullName =
+    str(basics.name ?? basics.fullName, 120) || [str(basics.firstName, 60), str(basics.lastName, 60)].filter(Boolean).join(" ");
+  const links: Resume["basics"]["links"] = [];
+  const addLink = (label: string, url: unknown) => {
+    const href = str(isObject(url) ? (url.href ?? url.url) : url, 300);
+    if (href && links.length < 6 && !links.some((l) => l.url === href)) links.push({ label: label.slice(0, 40) || "Link", url: href });
+  };
+  addLink("Website", basics.url ?? basics.website);
+  for (const p of [...asList(basics.profiles), ...asList(data.profiles), ...asList(basics.links), ...asList(data.links), ...asList(basics.socials)]) {
+    if (isObject(p)) addLink(str(p.network ?? p.label ?? p.name, 40) || "Profile", p.url ?? p.href ?? p.link);
+    else addLink("Link", p);
+  }
+  for (const key of ["linkedin", "github", "portfolio"]) addLink(humanize(key), basics[key] ?? data[key]);
+
+  const sectionsHolder = isObject(data.sections) ? data.sections : null;
+  const summarySource = basics.summary ?? data.summary ?? data.profile ?? data.about ?? data.objective ?? sectionsHolder?.summary;
   const resume: Resume = {
     version: 1,
     basics: {
-      name: text(basics.name, 120),
-      headline: text(basics.label, 160),
-      email: text(basics.email, 200),
-      phone: text(basics.phone, 40),
-      location: [text(basics.location?.city, 60), text(basics.location?.countryCode, 10)].filter(Boolean).join(", "),
-      links: [
-        ...(basics.url ? [{ label: "Website", url: text(basics.url, 300) }] : []),
-        ...list(basics.profiles).map((p) => ({ label: text(p.network, 40) || "Profile", url: text(p.url, 300) })),
-      ].slice(0, 6),
+      name: fullName,
+      headline: str(basics.label ?? basics.headline ?? basics.title ?? basics.jobTitle, 160),
+      email: str(basics.email, 200),
+      phone: str(basics.phone ?? basics.phoneNumber, 40),
+      location: placeOf(basics.location ?? basics.address ?? basics.city),
+      links,
     },
-    summary: text(basics.summary, 1500),
+    summary: str(isObject(summarySource) ? (summarySource.content ?? summarySource.text) : summarySource, 1500),
     sections: [],
-    skills: list(data.skills)
-      .slice(0, 12)
-      .map((s) => ({
-        id: newResumeId("k"),
-        name: text(s.name, 60) || "Skills",
-        items: list(s.keywords).map((k) => text(k, 60)).filter(Boolean).slice(0, 50),
-      })),
+    skills: skillGroupsOf(sectionsHolder ? { ...data, ...sectionsHolder } : data),
   };
 
-  const work = list(data.work).slice(0, 25).map((w) => ({
-    id: newResumeId("e"),
-    title: text(w.position, 160),
-    org: text(w.name ?? w.company, 160),
-    location: text(w.location, 120),
-    dates: range(w).slice(0, 60),
-    link: text(w.url, 300),
-    bullets: bullets([...(w.summary ? [w.summary] : []), ...list(w.highlights)]),
-  }));
-  const projects = list(data.projects).slice(0, 25).map((p) => ({
-    id: newResumeId("e"),
-    title: text(p.name, 160),
-    org: list(p.keywords).map((k) => text(k, 30)).join(", ").slice(0, 160),
-    location: "",
-    dates: range(p).slice(0, 60),
-    link: text(p.url, 300),
-    bullets: bullets([...(p.description ? [p.description] : []), ...list(p.highlights)]),
-  }));
-  const education = list(data.education).slice(0, 25).map((e) => ({
-    id: newResumeId("e"),
-    title: [text(e.studyType, 80), text(e.area, 80)].filter(Boolean).join(", "),
-    org: text(e.institution, 160),
-    location: "",
-    dates: range(e).slice(0, 60),
-    link: text(e.url, 300),
-    bullets: bullets([...(e.score ? [`GPA: ${text(e.score, 20)}`] : []), ...list(e.courses).slice(0, 1).map((c) => `Courses: ${list(e.courses).join(", ")}`.slice(0, 600)), ...list(e.highlights)]),
-  }));
+  // Candidate sections: top-level arrays, Reactive Resume's sections.{key}.items, or a sections array.
+  const candidates: [string, string, unknown[]][] = [];
+  for (const [key, v] of Object.entries(data)) {
+    if (!NOT_SECTIONS.test(key) && Array.isArray(v)) candidates.push([key, humanize(key), v]);
+  }
+  if (sectionsHolder) {
+    for (const [key, v] of Object.entries(sectionsHolder)) {
+      if (NOT_SECTIONS.test(key) || !isObject(v) || v.visible === false) continue;
+      if (Array.isArray(v.items)) candidates.push([key, str(v.name ?? v.title, 60) || humanize(key), v.items]);
+    }
+  } else if (Array.isArray(data.sections)) {
+    candidates.splice(candidates.findIndex(([key]) => key === "sections"), 1);
+    for (const v of data.sections) {
+      const items = isObject(v) ? (v.items ?? v.entries) : undefined;
+      if (isObject(v) && Array.isArray(items)) {
+        const title = str(v.title ?? v.name, 60) || "Section";
+        candidates.push([`${str(v.kind ?? v.type, 30)} ${title}`, title, items]);
+      }
+    }
+  }
 
-  if (education.length) resume.sections.push({ id: newResumeId("s"), kind: "education", title: "Education", entries: education });
-  if (work.length) resume.sections.push({ id: newResumeId("s"), kind: "experience", title: "Experience", entries: work });
-  if (projects.length) resume.sections.push({ id: newResumeId("s"), kind: "projects", title: "Projects", entries: projects });
+  const order: Record<ResumeSectionKind, number> = { education: 0, experience: 1, projects: 2, custom: 3 };
+  const sections: ResumeSection[] = [];
+  for (const [key, title, items] of candidates) {
+    const kind = sectionKind(key);
+    const entries = items.map((item) => entryOf(item, kind)).filter((e): e is ResumeEntry => e !== null).slice(0, 25);
+    if (!entries.length) continue;
+    sections.push({ id: newResumeId("s"), kind, title: kind === "custom" ? title : SECTION_TITLES[kind], entries });
+  }
+  resume.sections = sections.sort((a, b) => order[a.kind] - order[b.kind]).slice(0, 10);
+
+  if (!resume.basics.name && !resume.basics.email && !resume.sections.length && !resume.skills.length) return null;
   const parsed = resumeSchema.safeParse(resume);
   return parsed.success ? parsed.data : null;
 }
