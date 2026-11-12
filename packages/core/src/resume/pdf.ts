@@ -126,10 +126,12 @@ export async function renderResumePdf(resume: Resume): Promise<Uint8Array> {
       const titleWidth = bold.widthOfTextAtSize(titleText, 10.5);
       draw(titleText, MARGIN.x, 10.5, bold);
       // Keep the organisation on the title line when it fits beside the dates.
-      const orgRoom = contentWidth - titleWidth - rightWidth - 12;
+      // A small fixed gap: viewers that substitute Helvetica Bold draw it a little wider.
+      const gap = section.kind === "projects" ? 2 : 0;
+      const orgRoom = contentWidth - titleWidth - gap - rightWidth - 12;
       const orgText = pdfSafeText(org);
       const orgFits = regular.widthOfTextAtSize(orgText, 10.5) <= orgRoom;
-      if (orgText && orgFits) draw(orgText, MARGIN.x + titleWidth, 10.5, regular);
+      if (orgText && orgFits) draw(orgText, MARGIN.x + titleWidth + gap, 10.5, regular);
       if (right) draw(right, PAGE.width - MARGIN.x - rightWidth, 9.5, regular, MUTED);
       y -= 3.5;
       if (orgText && !orgFits) paragraph(entry.org, 10);

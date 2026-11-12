@@ -7,6 +7,8 @@
 export const RESUME_FILE_ACCEPT = ".pdf,.docx,.txt,.md,.json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,application/json";
 export const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
 
+import { cleanText, pdfItemsToText, type PdfTextItem } from "@orbit/core";
+
 export class ResumeFileError extends Error {}
 
 type FileKind = "pdf" | "docx" | "text" | "json";
@@ -45,30 +47,6 @@ export async function extractResumeText(file: File): Promise<{ text: string; kin
   return { text, kind };
 }
 
-/** Normalizes the odd characters PDFs and Word leave behind. */
-export function cleanText(text: string): string {
-  return (
-    text
-      .replace(/\r\n?/g, "\n")
-      // Private-use bullet glyphs from Word's Symbol and Wingdings fonts.
-      .replace(/[]/g, "•")
-      .replace(/[   ]/g, " ")
-      .replace(/[​-‍﻿]/g, "")
-      .replace(/ﬁ/g, "fi")
-      .replace(/ﬂ/g, "fl")
-      .replace(/[ \t]+\n/g, "\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .slice(0, 60_000)
-  );
-}
-
-interface PdfTextItem {
-  str: string;
-  transform: number[];
-  width: number;
-  hasEOL?: boolean;
-}
-
 async function readPdf(file: File): Promise<string> {
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
@@ -92,42 +70,6 @@ async function readPdf(file: File): Promise<string> {
   }
   await doc.destroy();
   return pages.join("\n\n");
-}
-
-/**
- * Rebuilds lines from positioned PDF text: a new line when the baseline moves,
- * a space when there's a visible gap between pieces of the same line.
- */
-export function pdfItemsToText(items: PdfTextItem[]): string {
-  const lines: string[] = [];
-  let line = "";
-  let lastY: number | null = null;
-  let lastEnd: number | null = null;
-  for (const item of items) {
-    const x = item.transform[4] ?? 0;
-    const y = item.transform[5] ?? 0;
-    const height = Math.abs(item.transform[3] ?? 10) || 10;
-    if (lastY !== null && Math.abs(y - lastY) > height * 0.4) {
-      lines.push(line);
-      line = "";
-      lastEnd = null;
-    }
-    if (item.str) {
-      const gap = lastEnd === null ? 0 : x - lastEnd;
-      if (line && gap > height * 0.15 && !line.endsWith(" ") && !item.str.startsWith(" ")) line += " ";
-      line += item.str;
-      lastEnd = x + item.width;
-      lastY = y;
-    }
-    if (item.hasEOL) {
-      lines.push(line);
-      line = "";
-      lastEnd = null;
-      lastY = null;
-    }
-  }
-  if (line) lines.push(line);
-  return lines.map((l) => l.replace(/\s+/g, " ").trim()).join("\n");
 }
 
 async function readDocx(file: File): Promise<string> {

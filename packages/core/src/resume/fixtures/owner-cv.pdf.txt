@@ -1,0 +1,275 @@
+  Alyemgul Guljazira
+
+  Budapest, Hungary | +36 00 000 0000 | candidate@example.com | linkedin.com/in/example-candidate
+
+Master CV: every project and role in one place. Copy from here into a tailored one-page CV for each application.
+
+Education
+
+  Budapest University of Technology and Economics (BME) Budapest, Hungary
+
+  Bachelor of Science in Computer Science Engineering Sep. 2023 – Expected 2027
+
+  Most recent semester GPA: 4.49/5.00
+
+  Thesis (TDK research): Improving Cross-Dataset Generalization and Adversarial Robustness of Synthetic-Image
+  Detectors, advisor Dr. Gergely A{{NUL}} cs
+
+Research
+
+  Synthetic-Image (Deepfake) Detection, Thesis Research | Python, PyTorch, Diffusion Models, Statistics
+
+  Evaluated 7 published detectors on 2,000 images from 5 datasets, comparing accuracy, TPR, FPR and AUC per data
+  source; a 5-model ensemble reached 93.3% accuracy, 14 points above the average single model, and 96.5% with
+  averaged confidence scores
+
+  Showed that a white-box PGD attack fools the ensemble on 99.9% of images (888 of 889); combining diffusion
+  purification with the ensemble kept 88% of detection at the cost of more false alarms, and a size-adaptive purifier
+  raised clean accuracy from 65.9% to 74.9%
+
+  Tested an adaptive attacker with exact gradients through the purifier (67 of 412 attacked images still detected) and a
+  region-voting defense that raised attack cost by up to 13%
+
+  Built a reproducible experiment pipeline on a shared GPU, with a separate Python environment and worker process per
+  detector, saved configs for every run, and bootstrap significance tests (2,000 resamples)
+
+AI and Data Projects
+
+  Orbit, AI-Assisted Job Application Platform | TypeScript, Next.js 15, React 19, PostgreSQL (Supabase), Chrome Extension
+  (MV3), GitHub Actions · github.com/Alyemgul/orbit · live demo
+
+  Built a full-stack job-search PWA that ingests 1,000+ postings per run from ~100 companies via Greenhouse, Lever,
+  Ashby, Workday and government job APIs, on a 6-hour GitHub Actions schedule with per-row retries so one bad record
+  never fails a run
+
+  Built data pipelines that normalise, de-duplicate and classify heterogeneous records from 10+ external APIs under rate
+  limits and free-tier quotas
+
+  Designed a rule-based resume match engine (keyword extraction, weighted scoring, nice-to-have detection) that scores
+  the newest 1,000 open jobs and classifies roles into 15 categories, including finance, legal-tech and health
+
+  Implemented fact-checked LLM resume tailoring (Groq/Gemini) that reverts any rewrite adding new numbers, skills
+  or employers, with a per-user daily AI budget and 30-day cache to stay within free tiers
+
+  Secured multi-user data with PostgreSQL row-level security, passwordless email-code sign-in, hashed revocable API
+  tokens for the Chrome extension, and GDPR-style data export and deletion
+
+  Shipped an installable, offline-capable PWA that passes axe accessibility audits, with 200+ automated tests (Vitest, in-
+  memory Postgres), running at $0/month on Vercel and Supabase free tiers
+
+  ReviewPilot, AI Assisted Code Review Tool | Python, Gemini API, GitHub Actions
+
+  Combined rule-based checks with LLM analysis to automatically review pull request diffs for bugs, security risks and
+  missing tests
+
+  Integrated it into a GitHub Actions CI/CD workflow so every pull request is reviewed automatically
+
+  RAG From Scratch | Python, LangChain, Embeddings, Vector Search
+
+  Built a retrieval augmented generation pipeline covering document indexing, embedding-based retrieval and answer
+  generation grounded in retrieved context
+
+  Autonomous Driving Bug Triage Agent | Python, Groq API (Llama 3 70B), sentence-transformers, scikit-learn, pandas
+
+  Built an agentic pipeline that triages autonomous-driving bug reports: classifies severity and subsystem (perception,
+  AEB, sensor fusion, planning), flags safety-critical issues, lists missing information, routes to a team and writes root-
+  cause hints and executive summaries
+
+  Detected duplicate reports with local sentence-transformer embeddings and cosine similarity, cross-checked by the
+  LLM, tested on a hand-built set of 30 reports with planted duplicates and deliberately vague entries, at $0 running cost
+
+  AI Sprint Assistant for Agile Teams | Python, FastAPI, React 18, Vite, Tailwind CSS, Groq / Claude APIs
+
+  Built a full-stack assistant for Scrum teams with a 5-step pipeline, working with a swappable LLM provider (Groq or
+  Anthropic Claude), that classifies sprint tickets, detects blockers and cross-team dependencies, flags risks (overload,
+  low velocity, blocked high-priority work) and extracts action items with owners
+
+  Exposed 6 FastAPI REST endpoints behind a 4-tab React UI for sprint analysis, standup summaries, rewriting vague
+  tickets into user stories with acceptance criteria, and retrospective analysis
+
+QAlytics, Software Quality Analysis Tool | Python, Streamlit, Gemini API, pandas · github.com/alyemgul/qalytics
+
+  Built an LLM-assisted quality analysis tool that reads requirements, test cases and bug reports (TXT/CSV/XLSX) and
+  flags ambiguous or contradictory requirements, untested requirements and recurring bug clusters
+
+  Paired each rule-based check (keyword matching, Jaccard similarity, regex) with Gemini explanations, rewrites and
+  suggested test cases, falling back to rules when the LLM is unavailable
+
+  Combined the results into a release-risk score with a go/no-go verdict, a 5-tab Streamlit dashboard and a
+  downloadable Markdown report
+
+AI Algorithms Labs | Python, scikit-learn, TensorFlow/Keras, NumPy, pandas
+
+  Implemented and evaluated core AI and ML algorithms from course lab templates: search, constraint satisfaction,
+  decision trees, Bayesian networks, neural networks, CNNs and ensemble learning
+
+Computer Vision Experiments | Python, OpenCV, NumPy, Matplotlib, Jupyter
+
+  Implemented core image processing methods in 9 OpenCV notebooks: convolution filters, edge detection, template
+  matching, Fourier frequency-domain filtering and morphological segmentation
+
+  Built motion tracking with optical flow, feature extraction with Hough transforms and ORB, and stereo matching with
+  3D point cloud reconstruction from a pinhole camera model
+
+Image Processing / AI Detection Project
+
+Sales Analytics Dashboard | Power BI, Power Query, Excel, Data Modeling
+
+  Built a five-page interactive Power BI report on Microsoft's AdventureWorks sales data, modelled with Power Query,
+  comparing sales and order quantities across product categories, countries, months and fiscal years
+
+  Added year-over-year monthly trend analysis, a country-level sales map and category and subcategory filters for self-
+  service business reporting
+
+Software and Systems Projects
+
+Cloud Deployment of Key Value Server with CI/CD | Docker, Kubernetes, GitHub Actions, Azure
+
+  Deploying my Redis-style key value server to a managed Kubernetes cluster on Azure, with a GitHub Actions pipeline
+  that builds and publishes the Docker image on every change, a cloud load balancer for client traffic, and Prometheus
+  and Grafana monitoring
+
+Kubernetes Deployment of Key Value Server | Docker, Kubernetes, minikube
+
+  Containerized my Redis-style key value server with Docker and deployed it on a local Kubernetes cluster with a
+  Deployment, Service, ConfigMap, TCP health probes and resource limits
+
+Container Runtime From Scratch | Python, C, Linux
+
+  Rebuilt core Docker features from raw Linux system calls (rubber-docker workshop), isolating processes with
+  namespaces, chroot/pivot_root and cgroups resource limits
+
+Redis-Style Key Value Database Server | Python, TCP Sockets, gevent
+
+  Implemented a concurrent key value database and client speaking the Redis wire protocol, supporting nested data
+  types and GET, SET, DELETE, FLUSH, MGET and MSET across many clients
+
+Pipe in the Desert, Team Project | Java, Git
+
+  Developed an object-oriented game in a 5-person Agile team using Git for version control
+
+Open Source Public Transportation Mapping Project
+
+MiraGram | Java, Java Swing
+
+  Built an Instagram-style social media desktop application in Java with a Swing graphical interface
+
+Blog Application v2 | C++, OOP, Templates
+
+  Rewrote the blog application in object-oriented C++ around my own templated vector container class, which stores and
+  manages the posts
+
+Mini Blog Console App | C
+
+  Built a console blog application in C that stores posts in a linked list and saves and loads them with file handling
+
+Password Strength Analyzer | Java 21, Gradle 9, JUnit 5, Mockito, JaCoCo, GitHub Actions · github.com/Alyemgul/password-
+
+strength-analyzer
+
+  Restructured a Java CLI that rates passwords with rule-based and dictionary checks into a layered multi-module Gradle
+  build (app, service, dictionary, core) with one-way dependencies, so the evaluation engine can be reused by other
+  frontends
+
+  Built a two-stage GitHub Actions pipeline on Ubuntu, Windows and macOS: build, unit tests and JaCoCo coverage, then
+  Bash and PowerShell integration tests of the packaged CLI on weak, medium and strong passwords, with Dependabot
+  keeping dependencies current
+
+Embedded and Hardware Projects
+
+Embedded Weather Station | ESP32, C/C++, Sensors
+
+  Built and programmed a sensor-based weather station during an intensive microelectronics summer school
+
+  5-Stage Pipelined RISC-V Processor | Verilog, ModelSim
+
+  Designed a 5-stage pipelined RISC-V processor in Verilog (fetch, decode, execute, memory, write-back) with a 32-
+  register file, ALU, control unit and pipeline registers
+
+  Resolved data hazards with an EX/MEM and MEM/WB forwarding unit, load-use hazards with stall insertion and taken
+  branches with pipeline flushes, and verified the final register and memory state in ModelSim waveforms
+
+  Parameterized Synchronous FIFO | Verilog, Icarus Verilog
+
+  Designed a synchronous FIFO in Verilog with configurable data width and depth, a circular buffer with read and write
+  pointers, full and empty flags, and overflow and underflow protection
+
+  Verified it with a structured testbench covering reset, full and empty boundaries, simultaneous read and write, and
+  pointer wrap-around
+
+  FSM-Based Vending Machine Controller | Verilog, Icarus Verilog
+
+  Designed a 4-state FSM vending controller in Verilog that accepts 5- and 10-unit coins, dispenses at 15 and returns
+  change on overpayment, using a registered overpayment flag instead of the live coin input for reliable behavior;
+  verified all payment paths in a testbench
+
+  Embedded Photo Booth Controller | Verilog, Icarus Verilog
+
+  Designed a 7-state FSM controller in Verilog for an imaging workflow (idle, 3-step countdown, capture, preview, save
+  or retake) and verified reset, save and retake paths in a testbench with waveforms
+
+Mobile Projects
+
+  Workplace Management Android App | Kotlin, Jetpack Compose, ViewModel, Material Design
+
+  Built a multi-screen Android app for employee profiles, holiday tracking and salary overview, with ViewModel state
+  management, a date picker for booking vacation days and a pie chart of taken versus remaining holidays
+
+  Android Wallet App | Kotlin, Jetpack Compose, Material Design
+
+  Built an income and expense tracker that shows a live balance and a transaction list, with quick-add via a floating
+  action button and bulk delete of incomes, expenses or all items
+
+  Public Transport Ticket App | Kotlin, Jetpack Compose, Material Design
+
+  Built a multi-screen Android ticketing app as mobile development coursework, where users pick a transport type (bus,
+  tram, metro), choose a pass and view it as a digital ticket
+
+  Simple Drawer | Kotlin, Jetpack Compose, Material Design
+
+  Built a touch-driven drawing app on a Compose Canvas with point and line drawing modes and a confirmation dialog
+  before clearing the canvas
+
+Experience
+
+  Teaching Assistant, Basics of Programming I 2025 – Present
+
+  Budapest University of Technology and Economics Budapest, Hungary
+
+  Support students learning foundational programming concepts, helping them debug code and communicating core CS
+  principles clearly to beginners
+
+  Educational Coordinator 2025 – Present
+
+  BME International Affairs Committee (IAC) Budapest, Hungary
+
+  Coordinate educational initiatives supporting international students' academic integration, acting as liaison between
+  the university and the international student community
+
+  Scriptwriter and Content Creator 2024 – Present
+
+  Gej Yu Ve Science Communication Initiative Remote
+
+  Write scripts for a Mongolian science communication YouTube channel with 222,000 subscribers, translating
+  technical topics into accessible content
+
+Technical Skills
+
+  Programming: Python, Java, TypeScript, C, C++, C#, Kotlin, SQL
+
+  AI and ML: PyTorch, scikit-learn, TensorFlow/Keras, NumPy, OpenCV, Ensembles, Model Evaluation, Adversarial Attacks
+  (PGD), Diffusion Purification, OpenAI API, Gemini API, Groq API, Anthropic Claude API, LangChain, RAG, Embeddings,
+  Vector Search, Prompt Engineering
+
+  Data and Statistics: Pandas, Streamlit, Bootstrap Resampling, Metrics (Accuracy, AUC, TPR/FPR), SQL Server, Oracle,
+  MongoDB, Power BI, Power Query, Excel
+
+  Backend and Systems: FastAPI, REST APIs, TCP Sockets, Linux, Docker, Kubernetes, Namespaces, cgroups
+
+  Web and Cloud: Next.js, React, Supabase, PostgreSQL (Row-Level Security), Vercel, PWA, Chrome Extensions (MV3)
+
+  DevOps and Testing: Git, GitHub Actions, Gradle, Pytest, Vitest, JUnit 5, SpotBugs
+
+  Mobile and Embedded: Kotlin, Jetpack Compose, ViewModel, ESP32, Verilog, ModelSim, Icarus Verilog
+
+  Spoken Languages: Mongolian (native), English (fluent)

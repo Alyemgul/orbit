@@ -107,6 +107,13 @@ function headerish(line: string): boolean {
   );
 }
 
+/** "Python, PyTorch, Diffusion Models" or "Kotlin, Jetpack Compose, Material Design": short items, no sentence. */
+function techList(line: string): boolean {
+  if (line.length > 200 || ACTION_START.test(line) || /[.!?:]$/.test(line)) return false;
+  const items = line.split(/\s*[,/]\s+|\s+·\s+/).filter(Boolean);
+  return items.length >= 2 && items.every((item) => item.length <= 40 && item.split(/\s+/).length <= 6);
+}
+
 function splitPlace(line: string): { name: string; place: string } {
   const match = line.match(TRAILING_PLACE);
   if (!match || match.index === undefined || match.index < 3) return { name: line, place: "" };
@@ -142,6 +149,12 @@ function logicalLines(input: string): string[] {
   const p90 = lengths.length >= 12 ? lengths[Math.floor(lengths.length * 0.9)]! : 0;
   const fullWidth = p90 >= 60 ? p90 * 0.72 : Infinity;
 
+  // When bullets keep their symbol and the text carries indentation (PDF
+  // import), an indented line after a bullet is that bullet wrapping, even if
+  // the PDF put a blank line in between; titles start at the left edge.
+  const glyphDoc = raw.filter((l) => BULLET.test(l)).length >= 3 && raw.some((l) => /^ {2}\S/.test(l) && !BULLET.test(l));
+  let inBullet = false;
+
   const out: string[] = [];
   let previousRaw = "";
   for (const rawLine of raw) {
@@ -150,6 +163,13 @@ function logicalLines(input: string): string[] {
       previousRaw = "";
       continue;
     }
+    if (BULLET.test(rawLine)) inBullet = true;
+    else if (glyphDoc && /^\s/.test(rawLine) && out.length && (inBullet || /^[^:•]{2,40}:\s/.test(out[out.length - 1]!))) {
+      // A bullet or a "Skills: a, b, c" line wrapping with a hanging indent.
+      out[out.length - 1] = `${out[out.length - 1]} ${line}`;
+      previousRaw = line;
+      continue;
+    } else if (glyphDoc) inBullet = false;
     // A word or link hyphenated across lines ("password-" / "strength-analyzer"), even across a blank line.
     const tail = out[out.length - 1] ?? "";
     if ((/\w-$/.test(tail) && /^[a-z]/.test(line) && !BULLET.test(rawLine)) || (/\w\/$/.test(tail) && /^[\w.-]+$/.test(line))) {
@@ -160,7 +180,7 @@ function logicalLines(input: string): string[] {
     const startsFresh =
       BULLET.test(rawLine) || headingKind(line) !== null || pipeHeader(line) !== null || (DATES.test(line) && ENDS_WITH_DATE.test(line) && line.length < 140);
     const continues = previousRaw !== "" && !startsFresh && (/^[a-z(&,;]/.test(line) || previousRaw.length >= fullWidth);
-    if (continues && out.length) out[out.length - 1] = `${out[out.length - 1]} ${line}`.replace(/(\w)- (\w)/g, "$1-$2");
+    if (continues && out.length) out[out.length - 1] = `${out[out.length - 1]} ${line}`;
     else out.push(line);
     previousRaw = line;
   }
@@ -169,6 +189,8 @@ function logicalLines(input: string): string[] {
 
 export function parseResumeText(input: string): Resume {
   const lines = logicalLines(input);
+  // Most bullets start with a symbol: then lines without one are never new bullets.
+  const glyphBullets = lines.filter((l) => BULLET.test(l)).length >= 3;
 
   const resume: Resume = {
     version: 1,
@@ -271,6 +293,21 @@ export function parseResumeText(input: string): Resume {
       continue;
     }
 
+    const kindNow = (section as unknown as ResumeSection).kind;
+    if (fresh && current) {
+      // A link on its own line under the title ("github.com/me/project").
+      const url = line.match(URL)?.[0];
+      if (url && url.length >= line.length - 2 && !current.link) {
+        current.link = url.slice(0, 300);
+        continue;
+      }
+      // A project's tech list on its own line: "TypeScript, Next.js 15, React 19, PostgreSQL".
+      if (kindNow === "projects" && !current.org && techList(line)) {
+        current.org = line.slice(0, 160);
+        continue;
+      }
+    }
+
     const dated = DATES.test(line) && ENDS_WITH_DATE.test(line) && line.length < 160;
     if (dated) {
       const parts = splitEntryLine(line);
@@ -290,7 +327,8 @@ export function parseResumeText(input: string): Resume {
     }
 
     if (headerish(line)) {
-      const { name, place } = splitPlace(line);
+      // Places ("Budapest, Hungary") trail organisation lines, not project titles.
+      const { name, place } = kindNow === "projects" ? { name: line, place: "" } : splitPlace(line);
       if (fresh && current) {
         // "Teaching Assistant, Basics of Programming I  2025 – Present" then
         // "Budapest University of Technology and Economics  Budapest, Hungary".
@@ -306,7 +344,13 @@ export function parseResumeText(input: string): Resume {
       continue;
     }
 
-    // Anything else is a sentence: a bullet of the current entry.
+    // Anything else is a sentence. Where bullets keep their symbol, a sentence
+    // without one is the rest of the bullet above, wrapped onto a new line.
+    if (glyphBullets && current && current.bullets.length) {
+      const last = current.bullets[current.bullets.length - 1]!;
+      last.text = `${last.text} ${line}`.slice(0, 600);
+      continue;
+    }
     if (!current) addEntry({ title: "", org: "", location: "", dates: "", link: "" });
     (entry as unknown as ResumeEntry).bullets.push({ id: newResumeId("b"), text: line.slice(0, 600) });
   }
