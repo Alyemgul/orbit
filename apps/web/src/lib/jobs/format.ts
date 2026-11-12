@@ -25,6 +25,9 @@ export const CATEGORY_LABELS: Record<JobCategory, string> = {
   other: "Other",
   quant: "Quant",
   tech_business: "Tech & business",
+  finance: "Finance",
+  legal_compliance: "Law & compliance",
+  health_bio: "Health & bio",
 };
 
 export const WORKPLACE_LABELS: Record<WorkplaceType, string | null> = {

@@ -42,6 +42,9 @@ export const JOB_CATEGORIES = [
   // Appended later: Postgres enums only grow at the end, and order is checked by tests.
   "quant",
   "tech_business",
+  "finance",
+  "legal_compliance",
+  "health_bio",
 ] as const;
 export type JobCategory = (typeof JOB_CATEGORIES)[number];
 

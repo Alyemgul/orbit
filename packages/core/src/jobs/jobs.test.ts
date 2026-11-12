@@ -69,6 +69,21 @@ describe("classifiers", () => {
     ["Product Designer", "design"],
     ["Account Executive - Commercial", "other"],
     ["Full-Stack Developer", "software_engineering"],
+    ["Legal Engineer", "legal_compliance"],
+    ["Compliance Analyst - KYC/AML (Graduate)", "legal_compliance"],
+    ["Privacy Engineer", "legal_compliance"],
+    ["Associate General Counsel", "legal_compliance"],
+    ["Credit Risk Analyst", "finance"],
+    ["Graduate Financial Analyst", "finance"],
+    ["Investment Banking Analyst", "finance"],
+    ["Fraud Analyst", "finance"],
+    ["Bioinformatics Scientist", "health_bio"],
+    ["Software Engineer, Clinical Data Platform", "health_bio"],
+    ["Technology Risk Analyst", "tech_business"],
+    ["Software Engineer, Payments", "software_engineering"],
+    ["Account Partner - Medical Device & Diagnostics", "other"],
+    ["Customer Success Engineer - Privacy Automation", "other"],
+    ["Technical Account Manager", "tech_business"],
   ] as const)("category of %s is %s", (title, category) => {
     expect(inferCategory(title)).toBe(category);
   });

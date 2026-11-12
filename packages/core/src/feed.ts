@@ -43,6 +43,10 @@ export const FEED_CATEGORY_GROUPS = {
   quant: { label: "Quant & trading", categories: ["quant"] },
   tech_business: { label: "Tech & business", categories: ["tech_business"] },
   product_design: { label: "Product & design", categories: ["product", "design"] },
+  // Other fields that use CS skills, kept apart from the computer-science groups.
+  finance: { label: "Finance", categories: ["finance"] },
+  legal: { label: "Law & compliance", categories: ["legal_compliance"] },
+  health: { label: "Health & bio", categories: ["health_bio"] },
   other: { label: "Other", categories: ["it_support", "other"] },
 } as const satisfies Record<string, { label: string; categories: readonly JobCategory[] }>;
 
