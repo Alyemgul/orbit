@@ -72,7 +72,7 @@ export default async function ProfilePage() {
             <CardDescription>
               {llm
                 ? `Using ${llm.label} (${llm.model}${llm.fallbackModel ? `, falls back to ${llm.fallbackModel}` : ""}). Repeat requests for the same job reuse earlier answers for free.`
-                : "Off. Add LLM_PROVIDER and LLM_API_KEY to apps/web/.env.local to turn it on (free providers)."}
+                : "Off. Add LLM_PROVIDER (groq) and LLM_API_KEY (a free key from console.groq.com) to your host's environment variables, e.g. Vercel → Settings → Environment Variables, then redeploy."}
             </CardDescription>
           </CardHeader>
           {llm && usage ? (
